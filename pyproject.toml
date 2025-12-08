@@ -12,8 +12,8 @@ dependencies = [
   "scikit-learn",
   "numba",
   "xarray",
-  "imageio=2.36.1",
-  "pillow=11.1.0"
+  "imageio==2.36.1",
+  "pillow==11.1.0"
 ]
 
 [project.optional-dependencies]
