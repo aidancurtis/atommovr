@@ -6,31 +6,18 @@ import os
 import platform
 import subprocess
 import sys
+import sysconfig
 
-# Locate the shared library in the c_code directory
-BASE_DIR = os.path.abspath(os.path.join(__file__, "../../../.."))
+HERE = os.path.dirname(os.path.abspath(__file__))
+ext_suffix = sysconfig.get_config_var("EXT_SUFFIX")
+LIB_PATH = os.path.join(HERE, "..", "..", "extern", f"libmatching_for_PPSU{ext_suffix}")
+lib = ctypes.CDLL(LIB_PATH)
 
-# Path to the PPSU2023 directory (in the project root)
-PPSU_DIR = os.path.join(BASE_DIR, "PPSU2023")
-
-# Path to the shared library and setup script
-LIB_PATH = os.path.join(PPSU_DIR, "libmatching_for_PPSU.so")
-SETUPC_PATH = os.path.join(PPSU_DIR, "setupc.py")
-
-def build_shared_library():
-    """Run PPSU2023/setupc.py to build the shared library."""
-    if not os.path.isfile(SETUPC_PATH):
-        raise RuntimeError(f"setupc.py not found at expected path: {SETUPC_PATH}")
-    print(f"[INFO] Attempting to build shared library via {SETUPC_PATH}...")
-    subprocess.run([sys.executable, SETUPC_PATH, "build_ext"], check=True, cwd=PPSU_DIR)
-    print("[INFO] Build completed.")
-
+# Load the shared library
 try:
     lib = ctypes.CDLL(LIB_PATH)
 except OSError as e:
-    print(f"[WARNING] Failed to load shared library at {LIB_PATH}: {e}")
-    build_shared_library()
-    lib = ctypes.CDLL(LIB_PATH)
+    raise RuntimeError(f"Cannot load shared library at {LIB_PATH}: {e}")
 
 # Platform-specific handling for accessing the standard C library
 try:

@@ -5,6 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "atommover"
 version = "0.1.0"
+requires-python = ">=3.8"
 dependencies = [
   "numpy",
   "scipy",
@@ -23,4 +24,4 @@ dev = ["ipykernel", "jupyter"]
 include = ["atommover*"]
 
 [tool.setuptools.package-data]
-"atommover" = ["PPSU2023/*", "PPSU2023/*.so"]
+"atommover" = ["extern/libmatching_for_PPSU.so"]
