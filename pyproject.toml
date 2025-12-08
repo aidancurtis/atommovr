@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=61.0"]
+requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -21,3 +21,6 @@ dev = ["ipykernel", "jupyter"]
 
 [tool.setuptools.packages.find]
 include = ["atommover*"]
+
+[tool.setuptools.package-data]
+"atommover" = ["PPSU2023/*", "PPSU2023/*.so"]
