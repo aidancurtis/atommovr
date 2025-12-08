@@ -10,7 +10,7 @@ dependencies = [
   "scipy",
   "matplotlib",
   "scikit-learn",
-  "numba::numba",
+  "numba",
   "xarray",
   "imageio=2.36.1",
   "pillow=11.1.0"
