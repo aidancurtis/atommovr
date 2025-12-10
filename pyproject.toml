@@ -18,10 +18,15 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["ipykernel", "jupyter"]
+dev = ["ipykernel", "jupyter", "pytest"]
 
 [tool.setuptools.packages.find]
 include = ["atommover*"]
 
 [tool.setuptools.package-data]
 "atommover" = ["extern/libmatching_for_PPSU.so"]
+
+[tool.pytest.ini_options]
+minversion = "7.0"
+addopts = "-ra -q -p no:warnings"
+testpaths = ["tests"]
