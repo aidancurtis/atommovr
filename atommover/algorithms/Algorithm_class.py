@@ -3,7 +3,7 @@
 #   Feel free to use this as a template for new algorithms.
 #   Each function below describes the requirements/what you need to put in it.
 
-# Author: Nikhil Harle
+# Author: Nikhil Harle, Aidan Curtis
 
 import numpy as np
 
@@ -76,79 +76,80 @@ class Algorithm:
     @staticmethod
     def get_success_flag(state: np.ndarray, target: np.ndarray, do_ejection: bool = False, n_species: int = 1) -> bool:
         """
-        Checks if the target configuration was prepared and returns a flag.
-
-        If do_ejection = False, the function only checks the square area around
-        the target configuration. If True, it checks the entire array.
+        Checks whether the target configuration has been successfully prepared.
 
         ## Parameters
-        FINISH THIS.
+        **state** : np.ndarray
+            The current configuration of the system. This can be a 2D array for a single species
+            or a 3D array if multiple species are present (rows x cols x species).
 
+        **target** : np.ndarray
+            The desired target configuration. Must have the same shape as `state`.
+
+        **do_ejection** : bool, optional (default = False)
+            If True, the function checks the entire `state` array against `target`.
+            If False, only the minimal bounding square around target atoms is checked.
+
+        **n_species** : int, optional (default = 1)
+            Number of species in the system.
+
+        ## Returns
+        **success_flag** : bool
+            True if the relevant part of `state` matches the `target` configuration, 
+            False otherwise. This flag helps verify whether the algorithm successfully 
+            prepared the desired configuration.
         """
         success_flag = False
-        if do_ejection == False:
-            start_row, end_row, start_col, end_col = get_effective_target_grid(target, n_species)
-        else:
-            start_row, start_col = 0,0
-            end_row, end_col = np.shape(state)[:2]
-            end_row -= 1
-            end_col -= 1
 
-        if np.shape(state) != np.shape(target):
-            print(f'Mismatch in shapes {np.shape(state)} and {np.shape(target)}. Reshaping.')
-            state = state.reshape(np.shape(target))
+        if state.shape != target.shape:
+            print(f'Mismatch in shapes {state.shape} and {target.shape}. Reshaping.')
+            state = state.reshape(target.shape)
 
+        if do_ejection:
+            return np.array_equal(state, target)
+
+        start_row, end_row, start_col, end_col = get_effective_target_grid(target, n_species)
         if n_species == 1:
-            if np.array_equal(state[start_row:end_row + 1, start_col:end_col + 1],target[start_row:end_row + 1, start_col:end_col + 1]):
-                success_flag = True
-        elif n_species == 2:
-            if np.array_equal(state[start_row:end_row + 1, start_col:end_col + 1,:],target[start_row:end_row + 1, start_col:end_col + 1,:]):
-                success_flag = True
-        
+            relevant_state = state[start_row:end_row + 1, start_col:end_col + 1]
+            relevant_target = target[start_row:end_row + 1, start_col:end_col + 1]
+        else:
+            relevant_state = state[start_row:end_row + 1, start_col:end_col + 1, :]
+            relevant_target = target[start_row:end_row + 1, start_col:end_col + 1, :]
+
+        target_mask = relevant_target.astype(bool)
+        success_flag = np.sum(relevant_state[target_mask]) == np.sum(relevant_target)
+
         return success_flag
-        
-def get_effective_target_grid(target, n_species = 1):
-    try:
-        n_rows, n_cols = target.shape
-    except ValueError:
-        n_rows, n_cols, _ = target.shape
-    for row_ind in range(n_rows):
-        if n_species == 1:
-            row = target[row_ind,:]
-        else:
-            row = target[row_ind, :, :]
-        if 1 in row:
-            start_row = row_ind
-            break
-    for row_ind in range(n_rows):
-        if n_species == 1:
-            row1 = target[n_rows-1-row_ind,:]
-        else:
-            row1 = target[n_rows-1-row_ind,:,:]
-        if 1 in row1:
-            end_row = n_rows-1-row_ind
-            break
 
-    for col_ind in range(n_cols):
-        if n_species == 1:
-            col = target[:,col_ind]
-        else:
-            col = target[:,col_ind,:]
-        if 1 in col:
-            start_col = col_ind
-            break
+def get_effective_target_grid(target: np.ndarray, n_species: int = 1) -> tuple[int, int, int, int]:
+    """
+    Returns the minimal bounding box around all atoms in the target configuration.
 
-    for col_ind in range(n_cols):
-        if n_species == 1:
-            col1 = target[:,n_cols-1-col_ind]
-        else:
-            col1 = target[:,n_cols-1-col_ind,:]
-        if 1 in col1:
-            end_col = n_cols-1-col_ind
-            break
-    try:
-        return start_row, end_row, start_col, end_col
-    except UnboundLocalError:
+    ## Parameters
+    **target** : np.ndarray
+        Target configuration array (2D for single species, 3D for multiple species).
+    **n_species** : int, optional (default = 1)
+        Number of species in the system.
+
+    ## Returns
+    start_row, end_row, start_col, end_col : int
+        Indices defining the minimal rectangle containing all target atoms.
+    """
+    # Flatten target array to 2D mask
+    if n_species == 1:
+        target_mask = target != 0
+    else:
+        target_mask = np.any(target != 0, axis=2)
+
+    # Boolean arrays indicating which rows/cols are occupied by target
+    rows = np.any(target_mask, axis=1)
+    cols = np.any(target_mask, axis=0)
+
+    if not np.any(rows) or not np.any(cols):
         raise Exception("Could not find atoms. Did you initialize a target configuration with AtomArray.generate_target()?")
 
+    # Convert boolean arrats into indices and get first and last cols
+    start_row, end_row = np.where(rows)[0][[0, -1]]
+    start_col, end_col = np.where(cols)[0][[0, -1]]
 
+    return start_row, end_row, start_col, end_col
