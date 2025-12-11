@@ -3,15 +3,19 @@
 import copy
 import math
 import random
-import numpy as np
-from collections import deque, Counter
+from collections import Counter, deque
 
-from atommover.utils.core import PhysicalParams, ArrayGeometry, Configurations, random_loading, generate_middle_fifty
+import numpy as np
+
 from atommover.utils.animation import dual_species_image, single_species_image
-from atommover.utils.move_utils import MoveType
+from atommover.utils.core import (ArrayGeometry, Configurations,
+                                  PhysicalParams, generate_middle_fifty,
+                                  random_loading)
+from atommover.utils.customize import SPECIES1NAME, SPECIES2NAME
 from atommover.utils.ErrorModel import ErrorModel
 from atommover.utils.errormodels import ZeroNoise
-from atommover.utils.customize import SPECIES1NAME, SPECIES2NAME
+from atommover.utils.move_utils import MoveType
+
 
 class AtomArray:
     """
@@ -186,8 +190,10 @@ class AtomArray:
         # evaluating moves from error model and assigning failure flags
         moves_w_flags = self.error_model.get_move_errors(state = self.matrix, moves=move_list)
 
+        moves_wo_conflicts, duplicate_move_inds = self._find_and_resolve_same_dest_moves(move_list)
+
         # prescreening moves to remove any intersecting tweezers
-        moves_wo_crossing, duplicate_move_inds = self._find_and_resolve_crossed_moves(moves_w_flags)
+        moves_wo_crossing, duplicate_move_inds = self._find_and_resolve_crossed_moves(moves_wo_conflicts)
 
         # applying moves on current state of array
         failed_moves, flags = self._apply_moves(moves_wo_crossing,
@@ -224,7 +230,49 @@ class AtomArray:
     
     def _get_duplicate_vals_from_list(self, l):
         return [k for k,v in Counter(l).items() if v>1]
-    
+
+    def _find_and_resolve_same_dest_moves(self, move_list: list) -> tuple[list, list]:
+        """
+        This function resolves situation where two moving tweezer end up at the same destination.
+
+        If any such tweezers are found, the atoms are only moved if they are both picked up, and the failure flag changes to 5.
+        """
+        destinations = []
+
+        for move in move_list:
+            destinations.append((move.to_row, move.to_col))
+
+        duplicate_vals = self._get_duplicate_vals_from_list(destinations)
+
+        dup_move_sets = [[] for i in range(len(duplicate_vals))]
+        dup_move_idxs = []
+        if duplicate_vals:
+            for move_idx, move in enumerate(move_list):
+                try:
+                    d_idx = duplicate_vals.index((move.to_row, move.to_col))
+                    dup_move_sets[d_idx].append(move_idx)
+                    dup_move_idxs.append(move_idx)
+                except ValueError:
+                    pass
+            for dup_move_set in dup_move_sets:
+                move_set_flag = 0
+                for move_idx in dup_move_set:
+                    move = move_list[move_idx]
+                    if self.matrix[move.from_row, move.from_col] == 1:
+                        if move.failure_flag != 1:
+                            move_set_flag += 1
+
+                if move_set_flag > 1:
+                    for move_idx in dup_move_set:
+                        move = move_list[move_idx]
+                        if move.failure_flag != 1:
+                            self.matrix[move.from_row][move.from_col][0] = 0
+                            if self.n_species == 2:
+                                self.matrix[move.from_row][move.from_col][1] = 0
+                            move.failure_flag = 5
+        
+        return move_list, dup_move_idxs
+
     def _find_and_resolve_crossed_moves(self, move_list: list) -> tuple[list, list]:
         """
         This function looks for situations where two moving tweezer paths cross over one another.
@@ -350,7 +398,8 @@ class AtomArray:
                     flags.append(move.failure_flag)
                     if move.failure_flag == 2: #PUTDOWNFAIL, see above
                         if state_before_moves[move.from_row][move.from_col] == 0:
-                            raise Exception(f"Error occured in MoveType. There is NO atom at ({move.from_row}, {move.from_col}).")
+                            continue
+                            # raise Exception(f"Error occured in MoveType. There is NO atom at ({move.from_row}, {move.from_col}).")
                         self.matrix[move.from_row][move.from_col] -= 1
                 # otherwise, if the target site is on the grid, you can implement it. 
                 # NB: the double occupation of a site from a illegal/collision move will be detected later in `move_atoms`
