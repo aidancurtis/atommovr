@@ -553,7 +553,7 @@ class Benchmarking:
         sufficient_flags = []
 
         if isinstance(self.target_configs, list):
-            if pattern != Configurations.RANDOM or pattern != None:
+            if isinstance(pattern, Configurations) and pattern != Configurations.RANDOM:
                 self.tweezer_array.generate_target(
                     pattern, occupation_prob=self.tweezer_array.params.loading_prob
                 )
