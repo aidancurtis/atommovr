@@ -3,6 +3,7 @@ import random
 from collections import Counter
 
 import numpy as np
+
 from atommover.utils import Move
 from atommover.utils.Tweezer import Tweezer, TweezerLossFlags
 
@@ -132,6 +133,12 @@ class TweezerArrayModel:
         return off_list
 
     def move_atoms(self, array: np.ndarray, verbose=False) -> tuple[float, int, int]:
+        """
+        Moves atoms according to the moves in self.move_sequence and self.tweezers
+
+        Returns:
+            (total_move_time, n_parallel_moves, n_total_moves): tuple[float, int, int]
+        """
         if verbose:
             print(array)
         self._set_move_failure_flags()
