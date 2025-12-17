@@ -10,7 +10,6 @@ import xarray as xr
 from atommover.algorithms.Algorithm_class import Algorithm, get_effective_target_grid
 from atommover.utils.AtomArray import AtomArray
 from atommover.utils.core import (
-    CONFIGURATION_PLOT_LABELS,
     Configurations,
     PhysicalParams,
     generate_random_init_configs,
@@ -72,33 +71,43 @@ class BenchmarkingFigure:
 
     def generate_scaling_figure(
         self,
-        x_axis,
-        benchmarking_results,
-        title,
-        x_label,
-        save,
+        x_axis: list,
+        benchmarking_results: xr.Dataset,
+        title: str,
+        x_label: str,
+        save: bool = False,
         savename="Algorithm_scaling",
     ):
-
         # Iterate over the y-axis variables
         _, ax = plt.subplots(
             len(self.y_axis_variables), 1, figsize=(5, 5 * len(self.y_axis_variables))
         )
+
+        # n_algorithms = benchmarking_results.sizes["algorithms"]
+
         for varind, y_var in enumerate(self.y_axis_variables):
             n_datapoints_added = 0
             y_axis = []
 
-            # Iterate over the benchmarking results of each algorithm
-            for algo_results in benchmarking_results:
-                # If the y-axis variable is a list (e.g. filling fraction), take its average
-                if type(algo_results[y_var]) is list:
-                    algo_results[y_var] = np.mean(algo_results[y_var])
+            # if y_var not in benchmarking_results.data_vars:
+            #     raise Exception
 
-                if math.isnan(algo_results[y_var]):
+            data_array = benchmarking_results[y_var].data_vars.values
+
+            # Iterate over the benchmarking results of each algorithm
+            for algo_results in data_array:
+                # If the y-axis variable is a list (e.g. filling fraction), take its average
+                if isinstance(algo_results, list):
+                    algo_results = float(np.mean(algo_results))
+
+                if not isinstance(algo_results, float):
+                    raise ValueError
+
+                if math.isnan(algo_results):
                     raise Exception(
                         "Data to plot contains nan, indicating that something went wrong in your benchmarking. Please examine data and try again."
                     )
-                y_axis.append(algo_results[y_var])
+                y_axis.append(algo_results)
 
                 n_datapoints_added += 1
 
@@ -109,14 +118,14 @@ class BenchmarkingFigure:
                             x_axis,
                             y_axis,
                             marker="o",
-                            label=algo_results["algorithm"].__class__.__name__,
+                            label=benchmarking_results.coords["algorithm"].values,
                         )
                     except TypeError:
                         ax.scatter(
                             x_axis,
                             y_axis,
                             marker="o",
-                            label=algo_results["algorithm"].__class__.__name__,
+                            label=benchmarking_results["algorithm"].__class__.__name__,
                         )
                     y_axis = []
 
@@ -135,7 +144,12 @@ class BenchmarkingFigure:
             plt.savefig(f"./figs/" + savename)
 
     def generate_histogram_figure(
-        self, benchmarking_results, title, x_label, save=False, savename="Histogram"
+        self,
+        benchmarking_results: xr.Dataset,
+        title: str,
+        x_label: str,
+        save=False,
+        savename="Histogram",
     ):
         hist_data = []
         algos_name = []
@@ -143,85 +157,91 @@ class BenchmarkingFigure:
             len(self.y_axis_variables), 1, figsize=(5, 5 * len(self.y_axis_variables))
         )
         for varind, y_var in enumerate(self.y_axis_variables):
+            data_array = benchmarking_results[y_var].data_vars.values
+            # Iterate over the benchmarking results of each algorithm
+            for i, algo_results in enumerate(data_array):
+                if not isinstance(algo_results, list):
+                    raise ValueError
 
-            for algo_results in benchmarking_results:
-                hist_data.append(algo_results[y_var])
-                algos_name.append(str(algo_results["algorithm"]))
+                hist_data.append(algo_results)
+                algos_name.append(
+                    str(benchmarking_results.coords["algorithm"].values[i])
+                )
 
             try:
-                ax[varind].set_xlabel(y_var.capitalize())
+                ax[varind].set_xlabel(x_label)
                 ax[varind].set_ylabel("Frequency")
-                ax[varind].set_title(f"{y_var.capitalize()} histogram")
+                ax[varind].set_title(f"{title}")
                 ax[varind].hist(hist_data, bins=10, label=algos_name)
                 ax[varind].legend()
             except TypeError:
-                ax.set_xlabel(y_var.capitalize())
+                ax.set_xlabel(x_label)
                 ax.set_ylabel("Frequency")
-                ax.set_title(f"{y_var.capitalize()} histogram")
+                ax.set_title(f"{title}")
                 ax.hist(hist_data, bins=10, label=algos_name)
                 ax.legend()
 
         if save:
             plt.savefig(f"./figs/{savename}")
 
-    def generate_pattern_figure(
-        self,
-        x_axis,
-        benchmarking_results,
-        title,
-        x_label,
-        save=False,
-        savename="Pattern_scaling",
-    ):
-
-        _, ax = plt.subplots(
-            len(self.y_axis_variables), 1, figsize=(5, 5 * len(self.y_axis_variables))
-        )
-        # Iterate over the y-axis variables
-        for varind, y_var in enumerate(self.y_axis_variables):
-            separate_pattern_flag = 0
-            y_axis = []
-
-            # Iterate over the benchmarking results of each target pattern
-            for pattern_results in benchmarking_results:
-
-                # If the y-axis variable is a list (e.g. filling fraction), take its average
-                if type(pattern_results[y_var]) is list:
-                    pattern_results[y_var] = np.mean(pattern_results[y_var])
-
-                y_axis.append(pattern_results[y_var])
-                separate_pattern_flag += 1
-
-                # If all the results of the algorithm are collected, plot the results
-                if separate_pattern_flag % len(x_axis) == 0:
-                    try:
-                        ax[varind].scatter(
-                            x_axis,
-                            y_axis,
-                            marker="o",
-                            label=CONFIGURATION_PLOT_LABELS[pattern_results["target"]],
-                        )
-                    except TypeError:
-                        ax.scatter(
-                            x_axis,
-                            y_axis,
-                            marker="o",
-                            label=CONFIGURATION_PLOT_LABELS[pattern_results["target"]],
-                        )
-                    y_axis = []
-            try:
-                ax[varind].set_xlabel(x_label)
-                ax[varind].set_ylabel(y_var.capitalize())
-                ax[varind].set_title(f"{title} - {y_var.capitalize()}")
-                ax[varind].legend(loc="best")
-            except TypeError:
-                ax.set_xlabel(x_label)
-                ax.set_ylabel(y_var.capitalize())
-                ax.set_title(f"{title} - {y_var.capitalize()}")
-                ax.legend(loc="best")
-
-        if save:
-            plt.savefig(f"./figs/{savename}")
+    # def generate_pattern_figure(
+    #     self,
+    #     x_axis: list,
+    #     benchmarking_results: xr.Dataset,
+    #     title: str,
+    #     x_label: str,
+    #     save: bool=False,
+    #     savename:str ="Pattern_scaling",
+    # ):
+    #
+    #     _, ax = plt.subplots(
+    #         len(self.y_axis_variables), 1, figsize=(5, 5 * len(self.y_axis_variables))
+    #     )
+    #     # Iterate over the y-axis variables
+    #     for varind, y_var in enumerate(self.y_axis_variables):
+    #         separate_pattern_flag = 0
+    #         y_axis = []
+    #
+    #         # Iterate over the benchmarking results of each target pattern
+    #         for data_name, data in benchmarking_results.data_vars.items():
+    #
+    #             # If the y-axis variable is a list (e.g. filling fraction), take its average
+    #             if isinstance(data, xr.DataArray):
+    #                 data = np.mean(data)
+    #
+    #             y_axis.append(data)
+    #             separate_pattern_flag += 1
+    #
+    #             # If all the results of the algorithm are collected, plot the results
+    #             if separate_pattern_flag % len(x_axis) == 0:
+    #                 try:
+    #                     ax[varind].scatter(
+    #                         x_axis,
+    #                         y_axis,
+    #                         marker="o",
+    #                         label=CONFIGURATION_PLOT_LABELS[pattern_results["target"]],
+    #                     )
+    #                 except TypeError:
+    #                     ax.scatter(
+    #                         x_axis,
+    #                         y_axis,
+    #                         marker="o",
+    #                         label=CONFIGURATION_PLOT_LABELS[pattern_results["target"]],
+    #                     )
+    #                 y_axis = []
+    #         try:
+    #             ax[varind].set_xlabel(x_label)
+    #             ax[varind].set_ylabel(y_var.capitalize())
+    #             ax[varind].set_title(f"{title} - {y_var.capitalize()}")
+    #             ax[varind].legend(loc="best")
+    #         except TypeError:
+    #             ax.set_xlabel(x_label)
+    #             ax.set_ylabel(y_var.capitalize())
+    #             ax.set_title(f"{title} - {y_var.capitalize()}")
+    #             ax.legend(loc="best")
+    #
+    #     if save:
+    #         plt.savefig(f"./figs/{savename}")
 
 
 # Set up the algorithms, target configurations, and system sizes
@@ -701,12 +721,12 @@ class Benchmarking:
                 "Array length (# atoms)",
             )
 
-        elif self.figure_output.figure_type == "pattern":
-            if savename == None:
-                savename = "pattern"
-            self.figure_output.generate_pattern_figure(
-                list(self.system_size_range),
-                self.benchmarking_results,
-                "Benchmarking results",
-                "Array length (# atoms)",
-            )
+        # elif self.figure_output.figure_type == "pattern":
+        #     if savename == None:
+        #         savename = "pattern"
+        #     self.figure_output.generate_pattern_figure(
+        #         list(self.system_size_range),
+        #         self.benchmarking_results,
+        #         "Benchmarking results",
+        #         "Array length (# atoms)",
+        #     )
