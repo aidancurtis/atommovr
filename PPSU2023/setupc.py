@@ -1,7 +1,8 @@
-from setuptools import setup, Extension
-from setuptools.command.build_ext import build_ext
 import os
 import sys
+
+from setuptools import Extension, setup
+from setuptools.command.build_ext import build_ext
 
 # Path to output directory
 output_dir = os.path.abspath("")
@@ -15,7 +16,11 @@ os.makedirs(output_dir, exist_ok=True)
 extra_compile_args = []
 if sys.platform == "win32":
     # MSVC specific flags (example: disable warning C4100: unreferenced formal parameter)
-    extra_compile_args=['-Wno-unused-parameter', '-Wno-unused-variable', '-Wno-parentheses']
+    extra_compile_args = [
+        "-Wno-unused-parameter",
+        "-Wno-unused-variable",
+        "-Wno-parentheses",
+    ]
 else:
     # GCC/Clang flags
     extra_compile_args = [
@@ -41,6 +46,7 @@ c_extension = Extension(
     libraries=["m"],
 )
 
+
 class BuildSharedLibrary(build_ext):
     def build_extensions(self):
         # Compile source files into object files
@@ -53,10 +59,9 @@ class BuildSharedLibrary(build_ext):
 
             # Link into a shared object
             lib_path = os.path.join(output_dir, "libmatching_for_PPSU.so")
-            self.compiler.link_shared_object(
-                objects, lib_path, libraries=ext.libraries
-            )
+            self.compiler.link_shared_object(objects, lib_path, libraries=ext.libraries)
             print(f"Built shared library: {lib_path}")
+
 
 setup(
     name="libmatching_for_PPSU",
