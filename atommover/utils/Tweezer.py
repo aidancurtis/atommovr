@@ -133,7 +133,7 @@ class Tweezer:
         return move_time, len(self.moves), success_flag, error_flags
 
     def make_move(
-        self, array: np.ndarray, past_array: np.ndarray, on: bool
+        self, array: np.ndarray, past_array: np.ndarray
     ) -> tuple[Move, TweezerLossFlags]:
         """
         Make self.moves[self.move_num] move
@@ -149,7 +149,12 @@ class Tweezer:
         self.move_time += (self.moves[index].distance * self.array_spacing) / self.speed
         self.move_num += 1
 
-        if not on or past_array[move.from_row, move.from_col] == 0:
+        if move.failure_flag == TweezerLossFlags.PICKUP_ERROR:
+            self.occupied = False
+            self.move_time = 0
+            return move, TweezerLossFlags.PICKUP_ERROR
+
+        if past_array[move.from_row, move.from_col] == 0:
             self.occupied = False
             self.move_time = 0
             return move, TweezerLossFlags.PICKUP_ERROR
@@ -161,7 +166,7 @@ class Tweezer:
             if pickup_error:
                 self.occupied = False
                 self.move_time = 0
-                return move, TweezerLossFlags.PICKUP_ERROR
+                return move, TweezerLossFlags.NO_ATOM_ERROR
             else:
                 self.occupied = True
 
@@ -176,7 +181,7 @@ class Tweezer:
             array[move.to_row, move.to_col] -= 1
             return move, TweezerLossFlags.VACUUM_ERROR
 
-        if move.failure_flag == 4:
+        if move.failure_flag == TweezerLossFlags.COLLISION_ERROR:
             self.occupied = False
             self.move_time = 0
             array[move.to_row, move.to_col] -= 1

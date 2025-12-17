@@ -1,33 +1,44 @@
 import copy
-import math
 import random
 from collections import Counter
 
 import numpy as np
 from atommover.utils import Move
-from atommover.utils.Tweezer import Tweezer
+from atommover.utils.Tweezer import Tweezer, TweezerLossFlags
 
 
-class TweezerArray:
+class TweezerArrayModel:
     """
-    A parent class representing a moving tweezer array
+    A parent class modeling a moving tweezer array
     """
 
     def __init__(
         self,
-        tweezers: list[Tweezer],
+        move_list: list[list[Move]],
         speed: float = 1e6,
         array_spacing: float = 5e-6,
         pickup_time: float = 1e-6,
         putdown_time: float = 1e-6,
     ):
-        self.tweezers: list[Tweezer] = tweezers
-        self.move_list: list[list[Move]] = []
-        self.max_moves = len(move_list)
+        self.tweezers: list[Tweezer] = []
+        self.max_moves = 0
+        for moves in move_list:
+            self.max_moves = max(self.max_moves, len(moves))
+            self.tweezers.append(Tweezer(moves=moves))
+
+        self.move_sequence: list[list[Move]] = [[] for i in range(self.max_moves)]
+        for moves in move_list:
+            for i in range(self.max_moves):
+                if i < len(moves):
+                    self.move_sequence[i].append(moves[i])
+
         self.speed = speed
         self.array_spacing = array_spacing
         self.pickup_time = pickup_time
         self.putdown_time = putdown_time
+
+    def __str__(self):
+        return "\n".join(str(tweezer) for tweezer in self.tweezers)
 
     def _get_duplicate_vals_from_list(self, l: list) -> list:
         """
@@ -37,9 +48,46 @@ class TweezerArray:
 
     def _set_move_failure_flags(self):
         """
-        Sets move failure flag for moves that collide
+        Sets move failure flags
         """
-        for parallel_move_seq in self.move_list:
+        self._set_collision_failure_flags()
+        self._set_same_source_failure_flags()
+
+    def _set_same_source_failure_flags(self):
+        """
+        Sets same source failure_flag i.e. move.failure_flag = TweezerLossFlags.PICKUP_ERROR
+        If multiple tweezers have same source at specific move, randomly choose one that grabs atom
+        and set failure flag for others
+        """
+        same_moves = []
+        for parallel_move_seq in self.move_sequence:
+            same_seq = []
+            for move in parallel_move_seq:
+                same_seq.append((move.from_row, move.from_col))
+            duplicate_srcs = self._get_duplicate_vals_from_list(same_seq)
+            duplicate_dict = {}
+            for move in parallel_move_seq:
+                idx = (move.from_row, move.from_col)
+                if idx in duplicate_srcs:
+                    if idx in duplicate_dict:
+                        duplicate_dict[idx].append(move)
+                        # move.failure_flag = TweezerLossFlags.NO_ATOM_ERROR
+                    else:
+                        duplicate_dict[idx] = [move]
+
+            same_moves.append(duplicate_dict)
+
+        for idx, same_val_dict in enumerate(same_moves):
+            for moves in same_val_dict.values():
+                moves.pop(random.randrange(len(moves)))
+                for move in moves:
+                    move.failure_flag = TweezerLossFlags.PICKUP_ERROR
+
+    def _set_collision_failure_flags(self):
+        """
+        Sets move failure flag for moves that collide i.e. move.failure_flag = TweezerLossFlags.COLLISION_FLAG
+        """
+        for parallel_move_seq in self.move_sequence:
             midpoints_seq = []
             for move in parallel_move_seq:
                 midpoints_seq.append((move.midx, move.midy))
@@ -48,7 +96,7 @@ class TweezerArray:
             for move in parallel_move_seq:
                 idx = (move.midx, move.midy)
                 if idx in keys:
-                    move.failure_flag = 4
+                    move.failure_flag = TweezerLossFlags.COLLISION_ERROR
 
     def _get_tweezer_off_list(self) -> list[list[int]]:
         """
@@ -59,7 +107,7 @@ class TweezerArray:
             off_list (list[list[int]]): list of list of tweezer ids to turn off
         """
         same = []
-        for parallel_move_seq in self.move_list:
+        for parallel_move_seq in self.move_sequence:
             same_seq = []
             for move in parallel_move_seq:
                 same_seq.append((move.from_row, move.from_col))
@@ -83,25 +131,30 @@ class TweezerArray:
 
         return off_list
 
-    def move_atoms(self, array: np.ndarray) -> tuple[float, int, int]:
+    def move_atoms(self, array: np.ndarray, verbose=False) -> tuple[float, int, int]:
+        if verbose:
+            print(array)
         self._set_move_failure_flags()
-        off_list = self._get_tweezer_off_list()
 
         n_parallel_moves = 0
         n_total_moves = 0
-        for i in range(len(self.move_list)):
+        for i in range(len(self.move_sequence)):
             past_array = copy.deepcopy(array)
             move_in_seq = 0
-            for idx, tweezer in enumerate(self.tweezers):
+            for tweezer in self.tweezers:
                 try:
-                    on = idx not in off_list[i]
-                    move, flag = tweezer.make_move(array, past_array, on=on)
+                    move, flag = tweezer.make_move(array, past_array)
+                    if verbose:
+                        print(f"move: {move}, flag: {flag}")
                     move_in_seq += 1
                 except:
                     pass
 
             array[np.where(array > 1)] = 0
             array[np.where(array < 0)] = 0
+            if verbose:
+                print(array)
+                print()
 
             n_parallel_moves += 1
             n_total_moves += move_in_seq
@@ -116,7 +169,7 @@ class TweezerArray:
 
 
 if __name__ == "__main__":
-    array = np.array([[1, 0, 0], [0, 0, 1], [1, 1, 0]])
+    array = np.array([[1, 0, 0], [0, 0, 0], [1, 1, 0]])
     print(array)
     # 1 0 0
     # 0 0 1
@@ -125,7 +178,7 @@ if __name__ == "__main__":
     tw1 = Tweezer(moves=moves1, pickup_error_prob=0)
     print(tw1)
 
-    moves2 = [Move(1, 2, 1, 1), Move(1, 1, 1, 0), Move(1, 0, 0, 0)]
+    moves2 = [Move(0, 0, 0, 1), Move(0, 1, 0, 2), Move(0, 2, 0, 1)]
     tw2 = Tweezer(moves=moves2, pickup_error_prob=0)
     print(tw2)
 
@@ -136,17 +189,17 @@ if __name__ == "__main__":
     # moves4 = [Move(1, 0, 1, 0), Move(2, 0, 2, 0), Move(1, 1, 1, 1)]
     # tw4 = Tweezer(moves=moves4)
     #
-    move_list = []
-    for i in range(3):
-        moves1[i].tweezer_id = 0
-        moves2[i].tweezer_id = 1
-        moves3[i].tweezer_id = 2
-        move_list.append([moves1[i], moves2[i], moves3[i]])
+    move_list = [moves1, moves2, moves3]
+    # for i in range(3):
+    #     moves1[i].tweezer_id = 0
+    #     moves2[i].tweezer_id = 1
+    #     moves3[i].tweezer_id = 2
+    #     move_list.append([moves1[i], moves2[i], moves3[i]])
+    #
+    # moves4[i].tweezer_id = 4
+    # move_list.append([moves1[i], moves2[i], moves3[i], moves4[i]])
 
-        # moves4[i].tweezer_id = 4
-        # move_list.append([moves1[i], moves2[i], moves3[i], moves4[i]])
-
-    t_array = TweezerArray([tw1, tw2, tw3])
-    t_array.move_list = move_list
-    t_array.move_atoms(array)
+    t_array = TweezerArrayModel(move_list=move_list)
+    print(t_array)
+    t_array.move_atoms(array, verbose=True)
     print(array)
