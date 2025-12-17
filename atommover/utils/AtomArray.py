@@ -3,7 +3,7 @@
 import copy
 import math
 import random
-from collections import Counter, deque
+from collections import Counter
 
 import numpy as np
 
@@ -18,6 +18,7 @@ from atommover.utils.core import (
 from atommover.utils.customize import SPECIES1NAME, SPECIES2NAME
 from atommover.utils.ErrorModel import ErrorModel
 from atommover.utils.errormodels import ZeroNoise
+from atommover.utils.Move import Move
 from atommover.utils.move_utils import MoveType
 
 
@@ -81,7 +82,7 @@ class AtomArray:
         # Always delegate to superclass to avoid recursion
         super().__setattr__(key, value)
 
-    def load_tweezers(self):
+    def load_tweezers(self) -> None:
         """
         Simulates uniform stochastic loading for single- or dual-species atom arrays.
         Loading probability (default 60%) can be set with `AtomArray.params.loading_prob`
@@ -109,7 +110,7 @@ class AtomArray:
         pattern: Configurations = Configurations.CHECKERBOARD,
         middle_size: list = [],
         occupation_prob: float = 0.5,
-    ):
+    ) -> None:
         if self.n_species == 1:
             self._generate_single_species_target(
                 pattern, middle_size=middle_size, occupation_prob=occupation_prob
@@ -128,7 +129,7 @@ class AtomArray:
         pattern: Configurations = Configurations.MIDDLE_FILL,
         middle_size: list = [],
         occupation_prob: float = 0.5,
-    ):
+    ) -> None:
         """
         A function for generating common target configurations,
         such as checkerboard, zebra stripes, and middle fill.
@@ -174,7 +175,7 @@ class AtomArray:
         pattern: Configurations = Configurations.ZEBRA_HORIZONTAL,
         middle_size: list = [],
         occupation_prob: float = 0.5,
-    ):
+    ) -> None:
         """
         A function for generating common target configurations,
         such as checkerboard, zebra stripes, and middle fill,
@@ -246,15 +247,9 @@ class AtomArray:
 
         self.target = np.stack([self.target_Rb, self.target_Cs], axis=2)
 
-    def move_atoms(self, move_list: list) -> list:
+    def move_atoms(self, move_list: list[Move]) -> tuple[list, float]:
         if np.max(self.matrix) > 1:
             raise Exception("Atom array cannot have values outside of {0,1}.")
-
-        # make sure `moves` is a list and not just a singular `Move` object
-        try:
-            move_list[0]
-        except TypeError:
-            move_list = [move_list]
 
         # evaluating moves from error model and assigning failure flags
         moves_w_flags = self.error_model.get_move_errors(
@@ -298,7 +293,7 @@ class AtomArray:
         move_time = max_distance / self.params.AOD_speed
 
         # applying error model to calculate atom loss during the time the move was applied
-        self.matrix, loss_flag = self.error_model.get_atom_loss(
+        self.matrix, _ = self.error_model.get_atom_loss(
             self.matrix, evolution_time=move_time, n_species=self.n_species
         )
 
@@ -326,7 +321,7 @@ class AtomArray:
         # 3. Sorting duplicate entries into distinct sets
         crossed_move_sets = []
         duplicate_move_inds = []
-        for i in range(len(duplicate_vals)):
+        for _ in range(len(duplicate_vals)):
             crossed_move_sets.append([])
         if len(crossed_move_sets) > 0:
             for m_ind, move in enumerate(move_list):
@@ -380,6 +375,8 @@ class AtomArray:
             return self._apply_moves_single_species(moves, duplicate_move_inds)
         elif self.n_species == 2:
             return self._apply_moves_dual_species(moves, duplicate_move_inds)
+        else:
+            return [], []
 
     def _apply_moves_single_species(
         self, moves: list, duplicate_move_inds: list = []
@@ -558,7 +555,9 @@ class AtomArray:
                         self.matrix[move.from_row][move.from_col][1] -= 1
         return failed_moves, flags
 
-    def image(self, move_list: list = [], plotted_species: str = "all", savename=""):
+    def image(
+        self, move_list: list = [], plotted_species: str = "all", savename=""
+    ) -> None:
         f"""
         Takes a snapshot of the atom array.
         ## Parameters
@@ -582,46 +581,36 @@ class AtomArray:
             else:
                 plotted_arrays = self
 
-            if plotted_species.lower() == "all":
+            if (
+                plotted_species.lower() == "all"
+                or plotted_species.lower() == SPECIES1NAME.lower()
+                or plotted_species.lower() == SPECIES2NAME.lower()
+            ):
                 dual_species_image(
                     plotted_arrays, move_list=move_list, savename=savename
-                )
-            elif plotted_species.lower() == SPECIES1NAME.lower():
-                dual_species_image(
-                    plotted_arrays,
-                    color_scheme="blue",
-                    move_list=move_list,
-                    savename=savename,
-                )
-            elif plotted_species.lower() == SPECIES2NAME.lower():
-                dual_species_image(
-                    plotted_arrays,
-                    color_scheme="yellow",
-                    move_list=move_list,
-                    savename=savename,
                 )
             else:
                 raise ValueError(
                     f"Invalid entry for parameter 'plotted_species': {plotted_species}. Please choose from ['{SPECIES1NAME}','{SPECIES2NAME}', 'all']."
                 )
 
-    def plot_target_config(self):
+    def plot_target_config(self) -> None:
         if self.n_species == 1:
             single_species_image(self.target)
         elif self.n_species == 2:
             dual_species_image(self.target)
 
-    def evaluate_moves(self, move_list: list) -> "tuple[float, list]":
+    def evaluate_moves(self, move_list: list) -> tuple[float, list]:
         # making reference time
         t_total = 0
         N_parallel_moves = 0
         N_non_parallel_moves = 0
 
         # iterating through moves and updating internal state matrix
-        for move_ind, move_set in enumerate(move_list):
+        for _, move_set in enumerate(move_list):
 
             # performing the move
-            [failed_moves, flags], move_time = self.move_atoms(move_set)
+            _, move_time = self.move_atoms(move_set)
             N_parallel_moves += 1
             N_non_parallel_moves += len(move_set)
 
@@ -629,4 +618,3 @@ class AtomArray:
             t_total += move_time
 
         return float(t_total), [N_parallel_moves, N_non_parallel_moves]
-
