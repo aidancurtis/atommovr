@@ -10,15 +10,12 @@ import matplotlib.pyplot as plt
 import numpy as np
 import xarray as xr
 
-from atommover.algorithms.Algorithm_class import Algorithm, get_effective_target_grid
+from atommover.algorithms.Algorithm_class import (Algorithm,
+                                                  get_effective_target_grid)
 from atommover.utils.AtomArray import AtomArray
-from atommover.utils.core import (
-    CONFIGURATION_PLOT_LABELS,
-    Configurations,
-    PhysicalParams,
-    generate_random_init_configs,
-    generate_random_target_configs,
-)
+from atommover.utils.core import (CONFIGURATION_PLOT_LABELS, Configurations,
+                                  PhysicalParams, generate_random_init_configs,
+                                  generate_random_target_configs)
 from atommover.utils.errormodels import ZeroNoise
 from atommover.utils.move_utils import move_atoms
 
@@ -274,7 +271,7 @@ class Benchmarking:
         n_shots: int = 100,
         n_species: int = 1,
         check_sufficient_atoms: bool = True,
-    ):
+    ) -> None:
         # initializing the sweep modules (minus target configs, see below)
         self.algos, self.n_algos = algos, len(algos)
         self.system_size_range, self.n_sizes = sys_sizes, len(sys_sizes)
@@ -301,13 +298,13 @@ class Benchmarking:
                     f"Number of system sizes {self.n_sizes} and shape of `target_configs` {np.shape(target_configs)} does not match. `target_configs` must have shape (len(sys_sizes), [number of target configs]). "
                 )
 
-    def save(self, savename):
+    def save(self, savename) -> None:
         if savename[-3:] == ".nc":
             savename = savename[0:-3]
         self.benchmarking_results.to_netcdf(f"data/{savename}.nc")
         print(f"Benchmarking object saved to `data/{savename}.nc`")
 
-    def load(self, loadname):
+    def load(self, loadname) -+ None:
         if loadname[-3:] == ".nc":
             loadname = loadname[0:-3]
         self.benchmarking_results = xr.open_dataset(
@@ -315,7 +312,7 @@ class Benchmarking:
         )
         print(f"Data from `data/{loadname}.nc` loaded to `self.benchmarking_results`.")
 
-    def load_params_from_dataset(self, dataset: xr.Dataset):
+    def load_params_from_dataset(self, dataset: xr.Dataset) -> None:
         """
         Overwrites current parameters for benchmarking sweeps with those
         from another xarray.Dataset object (e.g. `self.benchmarking_results`)
@@ -334,10 +331,10 @@ class Benchmarking:
             self.rounds_list.append(int(round))
         self.n_shots = len(dataset["filling fraction"].values[0][0][0][0][0][0])
 
-    def set_observables(self, observables: list):
+    def set_observables(self, observables: list) -> None:
         self.figure_output.y_axis_variables = observables
 
-    def get_result_array_dims(self):
+    def get_result_array_dims(self) -> None:
         """
         Updates the size and shape of the storage array
         based on the current set of parameters.
@@ -366,7 +363,7 @@ class Benchmarking:
         self.n_parsets = len(self.phys_params_list)
         self.n_rounds = len(self.rounds_list)
 
-    def run(self, do_ejection: bool = False):
+    def run(self, do_ejection: bool = False) -> None:
         """
         Run a round of benchmarking according to the parameters passed to the `Benchmarking()` object.
 
@@ -680,7 +677,7 @@ class Benchmarking:
             float(np.mean(sufficient_flags)),
         )
 
-    def plot_results(self, save=False, savename=None):
+    def plot_results(self, save=False, savename=None) -> None:
         """
         NB: This is a placeholder function for future feature development. See BenchmarkingFigure() for more details.
         """
