@@ -9,9 +9,13 @@ import numpy as np
 
 from atommover.utils import Move
 from atommover.utils.animation import dual_species_image, single_species_image
-from atommover.utils.core import (ArrayGeometry, Configurations,
-                                  PhysicalParams, generate_middle_fifty,
-                                  random_loading)
+from atommover.utils.core import (
+    ArrayGeometry,
+    Configurations,
+    PhysicalParams,
+    generate_middle_fifty,
+    random_loading,
+)
 from atommover.utils.customize import SPECIES1NAME, SPECIES2NAME
 from atommover.utils.ErrorModel import ErrorModel
 from atommover.utils.errormodels import ZeroNoise
@@ -301,7 +305,14 @@ class AtomArray:
     #
     #     return [failed_moves, flags], move_time
 
-    def move_atoms(self, moves: list[list[Move]]) -> tuple[float, int, int]
+    def move_atoms(self, moves: list[list[Move]]) -> tuple[float, int, int]:
+        """
+        Move atoms in tweezers according to moves
+        Each list in moves should include a list of sequential atom moves for a single tweezer
+
+        Returns:
+            (move_time, n_parallel_moves, n_total_moves): tuple[float, int, int]
+        """
         if np.max(self.matrix) > 1:
             raise Exception("Atom array cannot have values outside of {0,1}.")
         #
@@ -319,56 +330,6 @@ class AtomArray:
         move_time, n_parallel_moves, n_total_moves = tweezers.move_atoms(self.matrix)
 
         return move_time, n_parallel_moves, n_total_moves
-
-    def _get_duplicate_vals_from_list(self, l):
-        return [k for k, v in Counter(l).items() if v > 1]
-
-    def _find_and_resolve_crossed_moves(self, move_list: list) -> tuple[list, list]:
-        """
-        This function looks for situations where two moving tweezer paths cross over one another.
-
-        In this situation, it is assumed that any atoms being carried in the tweezers are lost.
-        If any such tweezers are found, the atoms are removed, and move.failure_flag is changed to 4.
-        """
-        # 1. getting midpoints of moves
-        midpoints = []
-
-        for move in move_list:
-            midpoints.append((move.midx, move.midy))
-
-        # 2. Finding duplicate midpoints
-        duplicate_vals = self._get_duplicate_vals_from_list(midpoints)
-
-        # 3. Sorting duplicate entries into distinct sets
-        crossed_move_sets = []
-        duplicate_move_inds = []
-        for i in range(len(duplicate_vals)):
-            crossed_move_sets.append([])
-        if len(crossed_move_sets) > 0:
-            for m_ind, move in enumerate(move_list):
-                try:
-                    d_ind = duplicate_vals.index((move.midx, move.midy))
-                    crossed_move_sets[d_ind].append(m_ind)
-                    duplicate_move_inds.append(m_ind)
-                except ValueError:
-                    pass
-            # 4. iterature through the sets of overlapping moves
-            for crossed_move_set in crossed_move_sets:
-                # 4.1. check to see if there are atoms that would be moved
-                for move_ind in crossed_move_set:
-                    move = move_list[move_ind]
-                    if np.sum(self.matrix[move.from_row, move.from_col, :]) == 1:
-                        # 4.2. if so, check whether the tweezer fails to pickup the atom
-                        if move.failure_flag != 1:
-                            self.matrix[move.from_row][move.from_col][0] = 0
-                            if self.n_species == 2:
-                                self.matrix[move.from_row][move.from_col][1] = 0
-                            move.failure_flag = 4
-                            move_list[move_ind] = move
-
-                    else:
-                        move.failure_flag = 3  # no atom to move
-        return move_list, duplicate_move_inds
 
     def image(self, move_list: list = [], plotted_species: str = "all", savename=""):
         f"""
@@ -414,6 +375,14 @@ class AtomArray:
             dual_species_image(self.target)
 
     def evaluate_moves(self, move_list: list[list[list[Move]]]) -> tuple[float, list]:
+        """
+        Move atoms in tweezers according to move_list
+        Each list in move_list represents a different tweezer move sequence
+        Each tweezer move sequence (list) is a list of sequential atom moves for a single tweezer
+
+        Returns:
+            (move_time, n_parallel_moves, n_total_moves): tuple[float, int, int]
+        """
         # making reference time
         t_total = 0
         N_parallel_moves = 0

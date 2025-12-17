@@ -2,6 +2,7 @@ import copy
 from enum import IntEnum
 
 import numpy as np
+
 from atommover.utils import Move
 
 
@@ -64,7 +65,7 @@ class Tweezer:
         Simulate a tweezer move sequence
 
         Returns:
-            tuple(float, int, bool, int): (total_move_time, num_moves, success_flag, error_flags)
+            (total_move_time, num_moves, success_flag, error_flags): tuple(float, int, bool, int)
         """
         success_flag = True
         error_flags = [0 for _ in self.moves]
@@ -88,7 +89,7 @@ class Tweezer:
                 error_flags[0] = TweezerLossFlags.COLLISION_ERROR
                 array[self.moves[0].to_row, self.moves[0].to_col] = 0
 
-        move_time = 0
+        move_time = (self.moves[0].distance * self.array_spacing) / self.speed
         pickup_flag = True
         for i in range(1, len(self.moves)):
             move = self.moves[i]
