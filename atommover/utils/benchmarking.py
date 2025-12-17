@@ -1,23 +1,22 @@
 # Object for running benchmarking rounds and saving data
 
-import copy
 import math
-import random
-import sys
 from typing import Union
 
 import matplotlib.pyplot as plt
 import numpy as np
 import xarray as xr
 
-from atommover.algorithms.Algorithm_class import (Algorithm,
-                                                  get_effective_target_grid)
+from atommover.algorithms.Algorithm_class import Algorithm, get_effective_target_grid
 from atommover.utils.AtomArray import AtomArray
-from atommover.utils.core import (CONFIGURATION_PLOT_LABELS, Configurations,
-                                  PhysicalParams, generate_random_init_configs,
-                                  generate_random_target_configs)
+from atommover.utils.core import (
+    CONFIGURATION_PLOT_LABELS,
+    Configurations,
+    PhysicalParams,
+    generate_random_init_configs,
+    generate_random_target_configs,
+)
 from atommover.utils.errormodels import ZeroNoise
-from atommover.utils.move_utils import move_atoms
 
 
 def evaluate_moves(array: AtomArray, move_list: list):
@@ -27,10 +26,9 @@ def evaluate_moves(array: AtomArray, move_list: list):
     N_non_parallel_moves = 0
 
     # iterating through moves and updating matrix
-    for move_ind, move_set in enumerate(move_list):
-
+    for move_set in move_list:
         # performing the move
-        [failed_moves, flags], move_time = array.move_atoms(move_set)
+        _, move_time = array.move_atoms(move_set)
         N_parallel_moves += 1
         N_non_parallel_moves += len(move_set)
 
@@ -83,7 +81,7 @@ class BenchmarkingFigure:
     ):
 
         # Iterate over the y-axis variables
-        fig, ax = plt.subplots(
+        _, ax = plt.subplots(
             len(self.y_axis_variables), 1, figsize=(5, 5 * len(self.y_axis_variables))
         )
         for varind, y_var in enumerate(self.y_axis_variables):
@@ -304,7 +302,7 @@ class Benchmarking:
         self.benchmarking_results.to_netcdf(f"data/{savename}.nc")
         print(f"Benchmarking object saved to `data/{savename}.nc`")
 
-    def load(self, loadname) -+ None:
+    def load(self, loadname) -> None:
         if loadname[-3:] == ".nc":
             loadname = loadname[0:-3]
         self.benchmarking_results = xr.open_dataset(
@@ -597,13 +595,11 @@ class Benchmarking:
             while round_count < num_rounds:
                 # generating and evaluating moves
                 if self.tweezer_array.n_species == 1:
-                    _, move_list, algo_success_flag = algorithm.get_moves(
+                    _, move_list, _ = algorithm.get_moves(
                         self.tweezer_array, do_ejection=do_ejection
                     )
                 else:
-                    _, move_list, algo_success_flag = algorithm.get_moves(
-                        self.tweezer_array
-                    )
+                    _, move_list, _ = algorithm.get_moves(self.tweezer_array)
                 t_total, _ = self.tweezer_array.evaluate_moves(move_list)
                 success_flag = Algorithm.get_success_flag(
                     self.tweezer_array.matrix,
