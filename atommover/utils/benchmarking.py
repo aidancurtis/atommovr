@@ -139,7 +139,7 @@ class BenchmarkingFigure:
     ):
         hist_data = []
         algos_name = []
-        fig, ax = plt.subplots(
+        _, ax = plt.subplots(
             len(self.y_axis_variables), 1, figsize=(5, 5 * len(self.y_axis_variables))
         )
         for varind, y_var in enumerate(self.y_axis_variables):
@@ -174,7 +174,7 @@ class BenchmarkingFigure:
         savename="Pattern_scaling",
     ):
 
-        fig, ax = plt.subplots(
+        _, ax = plt.subplots(
             len(self.y_axis_variables), 1, figsize=(5, 5 * len(self.y_axis_variables))
         )
         # Iterate over the y-axis variables
@@ -592,6 +592,9 @@ class Benchmarking:
                 raise ValueError(
                     f"Number of rearrangement rounds (entered as {num_rounds}) cannot be 0, negative, nor a non-integer value."
                 )
+
+            t_total = 0
+            success_flag = False
             while round_count < num_rounds:
                 # generating and evaluating moves
                 if self.tweezer_array.n_species == 1:
