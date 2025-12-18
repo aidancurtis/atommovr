@@ -5,11 +5,10 @@ import numpy as np
 from scipy.optimize import linear_sum_assignment
 from scipy.sparse import csr_matrix
 
-from atommover.algorithms.Algorithm_class import Algorithm
 from atommover.algorithms.source.ejection import ejection
 from atommover.algorithms.source.PPSU_weight_matching import bttl_threshold
 from atommover.algorithms.source.scaling_lower_bound import make_cost_matrix_square
-from atommover.utils.AtomArray import AtomArray
+from atommover.algorithms.utils import is_target_loaded
 from atommover.utils.core import Configurations, generate_middle_fifty, random_loading
 from atommover.utils.move_utils import Move, get_move_list_from_AOD_cmds, move_atoms
 
@@ -19,11 +18,12 @@ def parallel_LBAP_algorithm_works(
     target_config: np.ndarray,
     do_ejection: bool = False,
     round_lim: int = 15,
-):
+) -> tuple[np.ndarray, list[list[list[Move]]], bool]:
+
     # Initialize the variables
     LBAP_success_flag = False
     complete_flag = False
-    move_set = []
+    move_set: list[list[list[Move]]] = []
     matrix = copy.deepcopy(atom_arrays)
     round_count = 0
 
@@ -49,7 +49,7 @@ def parallel_LBAP_algorithm_works(
         move_set.extend(Hung_parallel_move_set)
 
         # effective_config = np.multiply(matrix, target_config)
-        if Algorithm.get_success_flag(
+        if is_target_loaded(
             matrix, target_config, do_ejection=do_ejection, n_species=1
         ):
             complete_flag = True
@@ -87,6 +87,9 @@ def generate_LBAP_assignments(matrix, target_config):
             reverse_cost_mat[i, j] = max_val + 1 - sq_cost[i, j]
 
     sparsemat = csr_matrix(reverse_cost_mat)
+    if not isinstance(sparsemat.shape, tuple):
+        raise AttributeError("sparsemat does not have shape attribute")
+
     result_dict = bttl_threshold(
         sparsemat.indptr,
         sparsemat.indices,
@@ -134,8 +137,8 @@ def Hungarian_algorithm_works(
     target_config: np.ndarray,
     do_ejection: bool = False,
     final_size: list = [],
-):
-    move_set = []
+) -> tuple[np.ndarray, list[list[list[Move]]], bool]:
+    move_set: list[list[list[Move]]] = []
     matrix = copy.deepcopy(atom_arrays)
 
     if len(final_size) == 0:
@@ -161,15 +164,16 @@ def Hungarian_algorithm_works(
     else:
         # Assign default values if paired_indices is empty
         sorted_row_ind, sorted_col_ind = [], []
+
     prepared_assignments = [
         (current_positions[i], target_positions[j])
         for i, j in zip(sorted_row_ind, sorted_col_ind)
     ]
 
     for start, target in prepared_assignments:
-        Hungarian_move = []
-        Hungarian_move = move_atom_and_show_grid(matrix, start, target)
-        move_set.extend(Hungarian_move)
+        _, hungarian_move = move_atom_and_show_grid(matrix, start, target)
+        tweezer_moves = get_tweezer_moves(hungarian_move)
+        move_set.extend(tweezer_moves)
 
     # Optional ejection argument
     if do_ejection:
@@ -178,7 +182,7 @@ def Hungarian_algorithm_works(
     else:
         eject_config = copy.deepcopy(matrix)
 
-    success_flag = Algorithm.get_success_flag(
+    success_flag = is_target_loaded(
         eject_config.reshape(np.shape(target_config)),
         target_config,
         do_ejection=do_ejection,
@@ -194,11 +198,11 @@ def parallel_Hungarian_algorithm_works(
     do_ejection: bool = False,
     final_size: list = [],
     round_lim: int = 15,
-):
+) -> tuple[np.ndarray, list[list[list[Move]]], bool]:
     # Initialize the variables
     Hungarian_success_flag = False
     complete_flag = False
-    move_set = []
+    move_set: list[list[list[Move]]] = []
     matrix = copy.deepcopy(atom_arrays)
     round_count = 0
 
@@ -223,7 +227,7 @@ def parallel_Hungarian_algorithm_works(
         move_set.extend(Hung_parallel_move_set)
 
         # effective_config = np.multiply(matrix, target_config)
-        if Algorithm.get_success_flag(
+        if is_target_loaded(
             matrix, target_config, do_ejection=do_ejection, n_species=1
         ):
             complete_flag = True
@@ -276,7 +280,7 @@ def generate_assignments(matrix, target_config, final_size):
     return prepared_assignments
 
 
-def generate_path(arrays, start, end):
+def generate_path(arrays: np.ndarray, start: tuple[int, int], end: tuple[int, int]):
     grid = copy.deepcopy(arrays)
     # Initialize current position
     current_pos = start
@@ -285,7 +289,9 @@ def generate_path(arrays, start, end):
     while current_pos != end:
         path, current_pos = bfs_move_atom(grid, current_pos, end, path)
 
-    path = flatten_tuple(path)[::-1]
+    if path[0] != start or current_pos != end:
+        return ValueError("Pussy")
+
     grid, path = generate_decomposed_move_set(grid, path)
 
     return path
@@ -323,8 +329,23 @@ def generate_cost_matrix(current_positions, target_positions):
     return cost_matrix
 
 
+def get_tweezer_moves(move_sequences: list[list[Move]]) -> list[list[list[Move]]]:
+    tweezer_moves = []
+    for move_seq in move_sequences:
+        tweezer_moves.append([move_seq])
+    return tweezer_moves
+
+
 ##Move the atom from start to end according to Hungarian assignment
-def move_atom_and_show_grid(grid, start, end):
+def move_atom_and_show_grid(
+    grid: np.ndarray, start: tuple[int, int], end: tuple[int, int]
+) -> tuple[np.ndarray, list[list[Move]]]:
+    """
+    This function generates a list of move sequences to get from start to end
+
+    Returns:
+        path (list[list[Move]]): representing a sequence of paths
+    """
     # Initialize current position
     current_pos = start
     path = []
@@ -332,10 +353,10 @@ def move_atom_and_show_grid(grid, start, end):
     while current_pos != end:
         path, current_pos = bfs_move_atom(grid, current_pos, end, path)
 
-    path = flatten_tuple(path)[::-1]
+    # path is list of positions
     grid, path = generate_decomposed_move_set(grid, path)
 
-    return path
+    return grid, path
 
 
 def generate_AOD_cmds(matrix, move_seq):
@@ -404,26 +425,24 @@ def generate_AOD_cmds(matrix, move_seq):
     return horiz_AOD_cmds, vert_AOD_cmds, parallel_success_flag
 
 
-def generate_decomposed_move_set(grid, path):
-    decomposed_move_set = []
+def generate_decomposed_move_set(
+    grid: np.ndarray, path: list[list[tuple[int, int]]]
+) -> tuple[np.ndarray, list[list[Move]]]:
+    """
+    This function takes in a list of list of positions and returns a list of list of moves
+    """
+    decomposed_move_set: list[list[Move]] = []
 
-    # Iterate all path segments (((a1,b1), (a2,b2), (a3, b3), (a4,b4)), ((c1,d1), (c2,d2)))
-    try:
-        for segmant in path:
-            from_row, from_col = segmant[0]
-            for coordinate in segmant:
-                to_row, to_col = coordinate
-                # To exclude the frist move
-                if from_row != to_row or from_col != to_col:
-                    decomposed_move_set.append(
-                        [Move(from_row, from_col, to_row, to_col)]
-                    )
-                    grid[from_row][from_col] = 0
-                    grid[to_row][to_col] = 1
-                    from_row, from_col = to_row, to_col
-            # decomposed_move_set.append(segmant_moves)
-    except IndexError:
-        return grid, []
+    for segment in path:
+        move_set = []
+        for i in range(len(segment) - 1):
+            pos = segment[i]
+            next_pos = segment[i + 1]
+            move_set.append(Move(pos[0], pos[1], next_pos[0], next_pos[1]))
+            grid[pos[0]][pos[1]] = 0
+            grid[next_pos[0]][next_pos[1]] = 1
+        if move_set:
+            decomposed_move_set.append(move_set)
 
     return grid, decomposed_move_set
 
@@ -448,7 +467,7 @@ def regroup_parallel_moves(matrix, move_seqq):
             if p_move_ind in parallel_ind_set:
                 continue
 
-            horiz_AOD_cmds, vert_AOD_cmds, can_parallelize = generate_AOD_cmds(
+            _, _, can_parallelize = generate_AOD_cmds(
                 matrix_copy, parallel_moves + [p_move]
             )
 
@@ -485,16 +504,18 @@ def regroup_parallel_moves(matrix, move_seqq):
     return parallel_seq
 
 
-def transform_paths_into_moves(matrix, N_independent_moves_path):
-    parallel_move_set = []
+def transform_paths_into_moves(
+    matrix, N_independent_moves_path
+) -> tuple[np.ndarray, list[list[list[Move]]]]:
+    parallel_move_set: list[list[list[Move]]] = []
 
     # 1. Build up intersection information for these N independent paths
     intersection_matrix = np.zeros(
         (len(N_independent_moves_path), len(N_independent_moves_path), 1)
     )
     intersection_coordinates = [
-        [[] for i in range(len(N_independent_moves_path))]
-        for j in range(len(N_independent_moves_path))
+        [[] for _ in range(len(N_independent_moves_path))]
+        for _ in range(len(N_independent_moves_path))
     ]
     intersection_set = {}
 
@@ -571,24 +592,49 @@ def transform_paths_into_moves(matrix, N_independent_moves_path):
 
 
 ##Find possible path between start and end position
-def bfs_move_atom(grid, start, end, prev_path):
+def bfs_move_atom(
+    grid: np.ndarray,
+    start: tuple[int, int],
+    end: tuple[int, int],
+    prev_path: list[list[tuple[int, int]]],
+) -> tuple[list[list[tuple[int, int]]], tuple[int, int]]:
+    """
+    The idea is this:
+        start:
+            current starting pos
+        end:
+            end pos
+        prev_path:
+            list of list of current path segments
+
+    If prev_path is empty we are starting from the beginning
+    If prev_path has paths already in it, start should be the pos of the last element
+    of the last path
+
+    If there is an obstacle, we should stop, and return path up to that point and obstacle
+
+    BFS takes in start, end, position and prev_path taken so far and tries to return
+    the best full path
+    """
     queue = deque(
         [(start[0], start[1], [(start[0], start[1])])]
     )  # Use the queue to record current position and path
-    visited = set()  # Record the visited positions
-    visited.add((start[0], start[1]))
 
+    visited = set()  # Record the visited positions
+    visited.add(start)
+
+    path: list[tuple[int, int]] = []
+    len_path = 0
+    dr = 0
+    dc = 0
+    current_pos = start
     # Start finding the path
     while queue:
         current_row, current_col, path = queue.popleft()  # Update current position
 
         # If we arrive end point, return the path
         if (current_row, current_col) == end:
-            if len(prev_path) > 0:
-                prev_path = prev_path, path
-            else:
-                prev_path = path
-
+            prev_path.append(path)
             return prev_path, end
 
         # Explore the next step (based on current position and end point)
@@ -604,24 +650,23 @@ def bfs_move_atom(grid, start, end, prev_path):
             else (-1 if end[1] < path[len_path][1] else 0)
         )
         new_row, new_col = current_row + dr, current_col + dc
+        new_pos = (new_row, new_col)
+        current_pos = new_pos
 
         # Check if there is an obstacle there (If no, start from this new point to find next step)
         if (new_row, new_col) not in visited and grid[new_row][new_col] == 0:
             visited.add((new_row, new_col))
-            queue.append((new_row, new_col, path + [(new_row, new_col)]))
+            path.append(new_pos)
+            queue.append((new_row, new_col, path))
 
     # If there is an obstacle on the path, we decompose the path: start->obstacle->target
     # Define the obstacle position
-    obstacle = (path[len_path][0] + dr, path[len_path][1] + dc)
 
     # Update the move in path until obstacle
-    if len(prev_path) > 0:
-        prev_path = prev_path, path + [obstacle]
-    else:
-        prev_path = path + [obstacle]
+    prev_path.append(path)
 
-    # [Path between start and obstacle] + [Path between obstacle and end]
-    return prev_path, obstacle
+    # [Path between start and obstacle] + obstacle
+    return prev_path, current_pos
 
 
 def check_intersection(path1, path2):
@@ -682,26 +727,10 @@ def flatten_tuple(nested_tuple):
     # Convert the list of tuples into a single tuple
     return tuple(result)
 
-    left_eject, bot_eject, top_eject, right_eject = [], [], [], []
-    len_x = len(matrix[0])
-    len_y = len(matrix)
-    for x in range(len_x):
-        for y in range(len_y):
-            if matrix[x][y] == 1 and target_config[x][y] == 0:
-                if x >= y and x < len_y - y:
-                    left_eject.append((x, y))
-                elif x >= y and x >= len_y - y:
-                    bot_eject.append((x, y))
-                elif x < y and x <= len_y - y:
-                    top_eject.append((x, y))
-                elif x <= y and x >= len_y - y:
-                    right_eject.append((x, y))
-    return left_eject, bot_eject, top_eject, right_eject
-
 
 def generate_target_config(
     size: list,
-    pattern: Configurations = 0,
+    pattern: Configurations = Configurations.ZEBRA_HORIZONTAL,
     middle_size: list = [],
     probability: float = 0.5,
 ) -> np.ndarray:

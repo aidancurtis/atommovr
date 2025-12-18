@@ -7,6 +7,7 @@
 import numpy as np
 
 from atommover.utils.AtomArray import AtomArray
+from atommover.utils.Move import Move
 
 
 class Algorithm:
@@ -33,7 +34,7 @@ class Algorithm:
 
     def get_moves(
         self, atom_array: AtomArray, do_ejection: bool = False
-    ) -> tuple[np.ndarray, list, bool]:
+    ) -> tuple[np.ndarray, list[list[list[Move]]], bool]:
         """
         This is the main function for the algorithm.
 
@@ -49,9 +50,10 @@ class Algorithm:
             1. `config` (np.ndarray) - the final configuration after all moves have been applied
                (ideally, this should just be the target configuration)
 
-            2. `move_list` (list of lists of `Move` objects) - contains all
+            2. `move_list` (list of lists of lists of `Move` objects) - contains all
                the moves to transform the initial configuration into the final configuration.
-               Each list inside `move_list` is a set of moves that will be done in parallel.
+               Each list inside `move_list` is a list of paths that should be done in parallel.
+               Each path includes a set of lists to be done by a single tweezer
 
                If you're confused by lists inside of lists, consider the following example:
                `move_list = [small_move_list, small_move_list1, small_move_list2]`

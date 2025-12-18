@@ -6,7 +6,6 @@ import random
 
 import numpy as np
 
-from atommover.utils import Move
 from atommover.utils.animation import dual_species_image, single_species_image
 from atommover.utils.core import (
     ArrayGeometry,
@@ -18,6 +17,7 @@ from atommover.utils.core import (
 from atommover.utils.customize import SPECIES1NAME, SPECIES2NAME
 from atommover.utils.ErrorModel import ErrorModel
 from atommover.utils.errormodels import ZeroNoise
+from atommover.utils.Move import Move
 from atommover.utils.TweezerArray import TweezerArrayModel
 
 
@@ -56,20 +56,24 @@ class AtomArray:
         geom: ArrayGeometry = ArrayGeometry.RECTANGULAR,
     ):
         self.geom = geom
-        self.shape = shape
         if n_species in [1, 2] and type(n_species) == int:
             self.n_species = n_species
         else:
             raise ValueError(
                 f"Invalid entry for parameter `n_species`: {n_species}. The simulator only supports single and dual species arrays. "
             )
+        self.shape = shape
         self.params = params
         self.error_model = error_model
 
-        self.matrix = np.zeros([self.shape[0], self.shape[1], self.n_species])
-        self.target = np.zeros([self.shape[0], self.shape[1], self.n_species])
-        self.target_Rb = np.zeros([self.shape[0], self.shape[1]])
-        self.target_Cs = np.zeros([self.shape[0], self.shape[1]])
+        self.matrix: np.ndarray = np.zeros(
+            [self.shape[0], self.shape[1], self.n_species]
+        )
+        self.target: np.ndarray = np.zeros(
+            [self.shape[0], self.shape[1], self.n_species]
+        )
+        self.target_Rb: np.ndarray = np.zeros([self.shape[0], self.shape[1]])
+        self.target_Cs: np.ndarray = np.zeros([self.shape[0], self.shape[1]])
 
     def __setattr__(self, key, value):
         if key == "shape":
@@ -262,6 +266,97 @@ class AtomArray:
 
         return move_time, n_parallel_moves, n_total_moves
 
+    def get_effective_target_grid(
+        self, target: np.ndarray | None = None
+    ) -> tuple[int, int, int, int]:
+        """
+        Returns the minimal bounding box around all atoms in the target configuration.
+
+        ## Returns
+        start_row, end_row, start_col, end_col : int
+            Indices defining the minimal rectangle containing all target atoms.
+        """
+        if not isinstance(target, np.ndarray):
+            target = self.target
+
+        # Flatten target array to 2D mask
+        if self.n_species == 1:
+            target_mask = target != 0
+        else:
+            target_mask = np.any(target != 0, axis=2)
+
+        # Boolean arrays indicating which rows/cols are occupied by target
+        rows = np.any(target_mask, axis=1)
+        cols = np.any(target_mask, axis=0)
+
+        if not np.any(rows) or not np.any(cols):
+            raise Exception(
+                "Could not find atoms. Did you initialize a target configuration with AtomArray.generate_target()?"
+            )
+
+        # Convert boolean arrats into indices and get first and last cols
+        start_row, end_row = np.where(rows)[0][[0, -1]]
+        start_col, end_col = np.where(cols)[0][[0, -1]]
+
+        return start_row, end_row, start_col, end_col
+
+    def is_target_loaded(
+        self,
+        target: np.ndarray | None = None,
+        do_ejection: bool = False,
+        n_species: int = 1,
+    ) -> bool:
+        """
+        Checks whether the target configuration has been successfully prepared.
+
+            The desired target configuration. Must have the same shape as `self.matrix`.
+
+        **do_ejection** : bool, optional (default = False)
+            If True, the function checks the entire `self.matrix` array against `target`.
+            If False, only the minimal bounding square around target atoms is checked.
+
+        **n_species** : int, optional (default = 1)
+            Number of species in the system.
+
+        ## Returns
+        **success_flag** : bool
+            True if the relevant part of `self.matrix` matches the `target` configuration,
+            False otherwise. This flag helps verify whether the algorithm successfully
+            prepared the desired configuration.
+        """
+        success_flag = False
+
+        if not isinstance(target, np.ndarray):
+            target = self.target
+
+        if self.matrix.shape != target.shape:
+            print(
+                f"Mismatch in shapes {self.matrix.shape} and {target.shape}. Reshaping."
+            )
+            self.matrix = self.matrix.reshape(target.shape)
+
+        if do_ejection:
+            return np.array_equal(self.matrix, target)
+
+        start_row, end_row, start_col, end_col = self.get_effective_target_grid(target)
+        if n_species == 1:
+            relevant_state = self.matrix[
+                start_row : end_row + 1, start_col : end_col + 1
+            ]
+            relevant_target = target[start_row : end_row + 1, start_col : end_col + 1]
+        else:
+            relevant_state = self.matrix[
+                start_row : end_row + 1, start_col : end_col + 1, :
+            ]
+            relevant_target = target[
+                start_row : end_row + 1, start_col : end_col + 1, :
+            ]
+
+        target_mask = relevant_target.astype(bool)
+        success_flag = np.sum(relevant_state[target_mask]) == np.sum(relevant_target)
+
+        return success_flag
+
     def image(self, move_list: list = [], plotted_species: str = "all", savename=""):
         f"""
         Takes a snapshot of the atom array.
@@ -305,7 +400,9 @@ class AtomArray:
         elif self.n_species == 2:
             dual_species_image(self.target)
 
-    def evaluate_moves(self, move_list: list[list[list[Move]]]) -> tuple[float, list]:
+    def evaluate_moves(
+        self, move_list: list[list[list[Move]]]
+    ) -> tuple[float, int, int]:
         """
         Move atoms in tweezers according to move_list
         Each list in move_list represents a different tweezer move sequence
@@ -316,16 +413,16 @@ class AtomArray:
         """
         # making reference time
         t_total = 0
-        N_parallel_moves = 0
-        N_non_parallel_moves = 0
+        n_parallel_moves = 0
+        n_non_parallel_moves = 0
 
         # iterating through moves and updating internal state matrix
         for _, move_set in enumerate(move_list):
             # performing the move
             move_time, n_par_move, n_moves = self.move_atoms(move_set)
 
-            N_parallel_moves += n_par_move
-            N_non_parallel_moves += n_moves
+            n_parallel_moves += n_par_move
+            n_non_parallel_moves += n_moves
             t_total += move_time
 
-        return float(t_total), [N_parallel_moves, N_non_parallel_moves]
+        return t_total, n_parallel_moves, n_non_parallel_moves

@@ -1,7 +1,7 @@
 import numpy as np
 
 import atommover.algorithms as algos
-from atommover.utils import AtomArray, Benchmarking, Move
+from atommover.utils.benchmarking import Benchmarking
 from atommover.utils.errormodels import UniformVacuumTweezerError
 
 

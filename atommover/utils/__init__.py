@@ -5,7 +5,8 @@ from atommover.utils.animation import (
     single_species_image,
 )
 from atommover.utils.AtomArray import AtomArray
-from atommover.utils.benchmarking import Benchmarking, BenchmarkingFigure
+
+# from atommover.utils.benchmarking import Benchmarking, BenchmarkingFigure
 from atommover.utils.core import ArrayGeometry, Configurations, PhysicalParams
 from atommover.utils.ErrorModel import ErrorModel
 from atommover.utils.errormodels import UniformVacuumTweezerError, ZeroNoise

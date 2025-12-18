@@ -3,7 +3,7 @@ from collections import deque
 from atommover.algorithms.source.Hungarian_works import generate_cost_matrix
 from atommover.algorithms.source.inside_out import *
 from atommover.utils.AtomArray import AtomArray
-from atommover.utils.core import Move
+from atommover.utils.Move import Move
 
 """
 Utils for pairing atoms and target vacancies.

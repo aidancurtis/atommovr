@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import xarray as xr
 
-from atommover.algorithms.Algorithm_class import Algorithm, get_effective_target_grid
+from atommover.algorithms.Algorithm import Algorithm
 from atommover.utils.AtomArray import AtomArray
 from atommover.utils.core import (
     Configurations,
@@ -604,13 +604,8 @@ class Benchmarking:
                     )
                 else:
                     _, move_list, _ = algorithm.get_moves(self.tweezer_array)
-                t_total, _ = self.tweezer_array.evaluate_moves(move_list)
-                success_flag = Algorithm.get_success_flag(
-                    self.tweezer_array.matrix,
-                    self.tweezer_array.target,
-                    do_ejection=do_ejection,
-                    n_species=self.tweezer_array.n_species,
-                )
+                t_total, _, _ = self.tweezer_array.evaluate_moves(move_list)
+                success_flag = self.tweezer_array.is_target_loaded()
                 if success_flag == 1:
                     break
                 round_count += 1
@@ -641,8 +636,8 @@ class Benchmarking:
                     )
                 )
             else:
-                start_row, end_row, start_col, end_col = get_effective_target_grid(
-                    self.tweezer_array.target
+                start_row, end_row, start_col, end_col = (
+                    self.tweezer_array.get_effective_target_grid()
                 )
                 wrong_places.append(
                     int(
