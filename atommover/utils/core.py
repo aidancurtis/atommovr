@@ -8,8 +8,6 @@ from enum import IntEnum
 import numpy as np
 from numba import jit
 
-from atommover.utils.Move import Move
-
 ###########
 # Classes #
 ###########
@@ -107,7 +105,7 @@ def generate_random_init_target_configs(
 ):
     init_config_storage = []
     target_config_storage = []
-    for shot in range(n_shots):
+    for _ in range(n_shots):
         initial_config = random_loading([max_sys_size, max_sys_size], load_prob)
         init_config_storage.append(initial_config)
         if target_config == [Configurations.RANDOM]:
@@ -120,7 +118,7 @@ def generate_random_init_target_configs(
 def generate_random_init_configs(n_shots, load_prob, max_sys_size, n_species=1):
 
     init_config_storage = []
-    for shot in range(n_shots):
+    for _ in range(n_shots):
         # initial_config = random_loading([max_sys_size, max_sys_size], load_prob)
         if n_species == 1:
             initial_config = random_loading([max_sys_size, max_sys_size], load_prob)
@@ -157,7 +155,7 @@ def generate_random_target_configs(n_shots: int, targ_occup_prob: float, shape: 
     occupation probability equal to targ_occup_prob.
     """
     target_config_storage = []
-    for shot in range(n_shots):
+    for _ in range(n_shots):
         target = random_loading(shape, targ_occup_prob)
         target_config_storage.append(target)
     return target_config_storage
@@ -211,7 +209,7 @@ def atom_loss(
     to exp(-move_time/lifetime)) of a background gas particle colliding
     with the atom and knocking it out of its trap.
     """
-    loss_flag = 0
+    loss_flag = False
     loss_mask_vals = random_loading(
         list(np.shape(matrix)), np.exp(-move_time / lifetime)
     )
@@ -222,7 +220,7 @@ def atom_loss(
     if np.array_equal(matrix, matrix_copy):
         pass
     else:
-        loss_flag = 1
+        loss_flag = True
     return matrix_copy, loss_flag
 
 
@@ -233,7 +231,7 @@ def atom_loss_dual(
     Given a Numpy array representing a dual-species atom array,
     simulates the process of atom loss over a length of time `move_time`.
     """
-    loss_flag = 0
+    loss_flag = False
     loss_mask = random_loading(list(np.shape(matrix)), np.exp(-move_time / lifetime))
     matrix_copy = copy.deepcopy(matrix)
     matrix_copy = np.multiply(matrix, loss_mask)
@@ -243,7 +241,7 @@ def atom_loss_dual(
                 matrix_copy[i][j][0] != matrix[i][j][0]
                 or matrix_copy[i][j][1] != matrix[i][j][1]
             ):
-                loss_flag = 1
+                loss_flag = True
     return matrix, loss_flag
 
 
