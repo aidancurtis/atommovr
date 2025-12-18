@@ -7,7 +7,6 @@ import random
 import numpy as np
 
 from atommover.animation import dual_species_image, single_species_image
-from atommover.error_model import ErrorModel
 from atommover.move import Move
 from atommover.tweezer_array import TweezerArrayModel
 from atommover.utils.core import (
@@ -18,7 +17,6 @@ from atommover.utils.core import (
     random_loading,
 )
 from atommover.utils.customize import SPECIES1NAME, SPECIES2NAME
-from atommover.utils.errormodels import ZeroNoise
 
 
 class AtomArray:
@@ -32,9 +30,6 @@ class AtomArray:
         whether the atom array is single- or dual-species. must be in [1,2].
     params : PhysicalParams
         the physical parameters describing tweezer and array properties.
-    error_model : ErrorModel (or child class)
-        an error model object that describes the physical error process (e.g.
-        imperfect tweezer transfer, error from background gas collisions).
     geom : ArrayGeometry
         the geometry of the array.
 
@@ -52,7 +47,6 @@ class AtomArray:
         shape: list = [10, 10],
         n_species: int = 1,
         params: PhysicalParams = PhysicalParams(),
-        error_model: ErrorModel = ZeroNoise(),
         geom: ArrayGeometry = ArrayGeometry.RECTANGULAR,
     ):
         self.geom = geom
@@ -64,7 +58,6 @@ class AtomArray:
             )
         self.shape = shape
         self.params = params
-        self.error_model = error_model
 
         self.matrix: np.ndarray = np.zeros(
             [self.shape[0], self.shape[1], self.n_species]

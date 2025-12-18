@@ -9,8 +9,9 @@ from atommover.algorithms.source.ejection import ejection
 from atommover.algorithms.source.PPSU_weight_matching import bttl_threshold
 from atommover.algorithms.source.scaling_lower_bound import make_cost_matrix_square
 from atommover.algorithms.utils import is_target_loaded
+from atommover.tweezer_array import TweezerArrayModel
 from atommover.utils.core import Configurations, generate_middle_fifty, random_loading
-from atommover.utils.move_utils import Move, get_move_list_from_AOD_cmds, move_atoms
+from atommover.utils.move_utils import Move, get_move_list_from_AOD_cmds
 
 
 def parallel_LBAP_algorithm_works(

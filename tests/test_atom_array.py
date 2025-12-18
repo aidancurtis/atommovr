@@ -3,7 +3,6 @@ import numpy as np
 from atommover.atom_array import AtomArray
 from atommover.move import Move
 from atommover.utils.core import Configurations
-from atommover.utils.errormodels import UniformVacuumTweezerError
 
 
 def test_atom_array_initialization():

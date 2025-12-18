@@ -15,7 +15,6 @@ from atommover.utils.core import (
     generate_random_init_configs,
     generate_random_target_configs,
 )
-from atommover.utils.errormodels import ZeroNoise
 
 
 class BenchmarkingFigure:
@@ -242,8 +241,6 @@ class Benchmarking:
         IF a list of np.ndarrays, must provide targets for all system sizes; i.e. must have shape (len(sys_sizes), #targets), where #targets is the number of target configs.
     - `sys_sizes` (range):
         lengths of the square arrays that you want to look at (sqrt(N), where N is the number of tweezer sites).
-    - `exp_params` (`PhysicalParams`):
-        error and experimental parameters.
     - `n_shots` (int, default 100):
         number of repetitions per (algorithm or target config) per system size.
     - `n_species` (int, default 1):
@@ -262,7 +259,6 @@ class Benchmarking:
         self,
         algos: list = [Algorithm()],
         target_configs: Union[list, np.ndarray] = [Configurations.MIDDLE_FILL],
-        error_models_list: list = [ZeroNoise()],
         phys_params_list: list = [PhysicalParams()],
         sys_sizes: list = list(range(10, 16)),
         rounds_list: list = [1],
@@ -274,9 +270,6 @@ class Benchmarking:
         # initializing the sweep modules (minus target configs, see below)
         self.algos, self.n_algos = algos, len(algos)
         self.system_size_range, self.n_sizes = sys_sizes, len(sys_sizes)
-        self.error_models_list, self.n_models = error_models_list, len(
-            error_models_list
-        )
         self.phys_params_list, self.n_parsets = phys_params_list, len(phys_params_list)
         self.rounds_list, self.n_rounds = rounds_list, len(rounds_list)
 
@@ -322,7 +315,6 @@ class Benchmarking:
         self.algos = dataset["algorithm"].values
         self.target_configs = dataset["target"].values
         self.system_size_range = dataset["sys size"].values
-        self.error_models_list = dataset["error model"].values
         self.phys_params_list = dataset["physical params"].values
         rounds_list = dataset["num rounds"].values
         self.rounds_list = []
@@ -358,7 +350,6 @@ class Benchmarking:
                 "`target_configs` must be a list of Configuration objects or an np.ndarray."
             )
         self.n_sizes = len(self.system_size_range)
-        self.n_models = len(self.error_models_list)
         self.n_parsets = len(self.phys_params_list)
         self.n_rounds = len(self.rounds_list)
 
@@ -375,7 +366,6 @@ class Benchmarking:
             self.n_algos,
             self.n_targets,
             self.n_sizes,
-            self.n_models,
             self.n_parsets,
             self.n_rounds,
         ]
@@ -392,7 +382,6 @@ class Benchmarking:
             "algorithm",
             "target",
             "sys size",
-            "error model",
             "physical params",
             "num rounds",
         )
@@ -404,7 +393,6 @@ class Benchmarking:
             "algorithm": self.algos,
             "target": coord_targets,
             "sys size": self.system_size_range,
-            "error model": self.error_models_list,
             "physical params": self.phys_params_list,
             "num rounds": self.rounds_list,
         }
@@ -428,88 +416,78 @@ class Benchmarking:
                             targ_occup_prob=self.tweezer_array.params.target_occup_prob,
                             shape=self.tweezer_array.shape,
                         )
-                for model_ind, error_model in enumerate(self.error_models_list):
-                    self.tweezer_array.error_model = error_model
-
-                    for size_ind, size in enumerate(self.system_size_range):
-                        self.tweezer_array.shape = [size, size]
-                        if not isinstance(self.target_configs, list):
-                            self.tweezer_array.target = self.target_configs[
-                                size_ind, targ_ind
-                            ]
-                        for alg_ind, algo in enumerate(self.algos):
-                            for round_ind, num_rounds in enumerate(self.rounds_list):
-                                (
-                                    success_rate,
-                                    mean_success_time,
-                                    fill_fracs,
-                                    wrong_places,
-                                    atoms_in_arrays,
-                                    atoms_in_target,
-                                    sufficient_rate,
-                                ) = self._run_benchmark_round(
-                                    algo,
-                                    do_ejection=do_ejection,
-                                    pattern=target,
-                                    num_rounds=num_rounds,
-                                )
-                                # populating result arrays
-                                success_rate_array[
-                                    alg_ind,
-                                    targ_ind,
-                                    size_ind,
-                                    model_ind,
-                                    param_ind,
-                                    round_ind,
-                                ] = success_rate
-                                time_array[
-                                    alg_ind,
-                                    targ_ind,
-                                    size_ind,
-                                    model_ind,
-                                    param_ind,
-                                    round_ind,
-                                ] = mean_success_time
-                                fill_fracs_array[
-                                    alg_ind,
-                                    targ_ind,
-                                    size_ind,
-                                    model_ind,
-                                    param_ind,
-                                    round_ind,
-                                ] = fill_fracs
-                                wrong_places_array[
-                                    alg_ind,
-                                    targ_ind,
-                                    size_ind,
-                                    model_ind,
-                                    param_ind,
-                                    round_ind,
-                                ] = wrong_places
-                                n_atoms_array[
-                                    alg_ind,
-                                    targ_ind,
-                                    size_ind,
-                                    model_ind,
-                                    param_ind,
-                                    round_ind,
-                                ] = atoms_in_arrays
-                                n_targets_array[
-                                    alg_ind,
-                                    targ_ind,
-                                    size_ind,
-                                    model_ind,
-                                    param_ind,
-                                    round_ind,
-                                ] = atoms_in_target
-                                sufficient_atom_rate[
-                                    alg_ind,
-                                    targ_ind,
-                                    size_ind,
-                                    model_ind,
-                                    param_ind,
-                                    round_ind,
-                                ] = sufficient_rate
+                for size_ind, size in enumerate(self.system_size_range):
+                    self.tweezer_array.shape = [size, size]
+                    if not isinstance(self.target_configs, list):
+                        self.tweezer_array.target = self.target_configs[
+                            size_ind, targ_ind
+                        ]
+                    for alg_ind, algo in enumerate(self.algos):
+                        for round_ind, num_rounds in enumerate(self.rounds_list):
+                            (
+                                success_rate,
+                                mean_success_time,
+                                fill_fracs,
+                                wrong_places,
+                                atoms_in_arrays,
+                                atoms_in_target,
+                                sufficient_rate,
+                            ) = self._run_benchmark_round(
+                                algo,
+                                do_ejection=do_ejection,
+                                pattern=target,
+                                num_rounds=num_rounds,
+                            )
+                            # populating result arrays
+                            success_rate_array[
+                                alg_ind,
+                                targ_ind,
+                                size_ind,
+                                param_ind,
+                                round_ind,
+                            ] = success_rate
+                            time_array[
+                                alg_ind,
+                                targ_ind,
+                                size_ind,
+                                param_ind,
+                                round_ind,
+                            ] = mean_success_time
+                            fill_fracs_array[
+                                alg_ind,
+                                targ_ind,
+                                size_ind,
+                                param_ind,
+                                round_ind,
+                            ] = fill_fracs
+                            wrong_places_array[
+                                alg_ind,
+                                targ_ind,
+                                size_ind,
+                                param_ind,
+                                round_ind,
+                            ] = wrong_places
+                            n_atoms_array[
+                                alg_ind,
+                                targ_ind,
+                                size_ind,
+                                param_ind,
+                                round_ind,
+                            ] = atoms_in_arrays
+                            n_targets_array[
+                                alg_ind,
+                                targ_ind,
+                                size_ind,
+                                param_ind,
+                                round_ind,
+                            ] = atoms_in_target
+                            sufficient_atom_rate[
+                                alg_ind,
+                                targ_ind,
+                                size_ind,
+                                param_ind,
+                                round_ind,
+                            ] = sufficient_rate
 
         success_rates_da = xr.DataArray(success_rate_array, dims=dims, coords=coords)
         success_times_da = xr.DataArray(time_array, dims=dims, coords=coords)
