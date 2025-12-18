@@ -18,25 +18,6 @@ from atommover.utils.core import (
 from atommover.utils.errormodels import ZeroNoise
 
 
-def evaluate_moves(array: AtomArray, move_list: list):
-    # making reference time
-    t_total = 0
-    N_parallel_moves = 0
-    N_non_parallel_moves = 0
-
-    # iterating through moves and updating matrix
-    for move_set in move_list:
-        # performing the move
-        _, move_time = array.move_atoms(move_set)
-        N_parallel_moves += 1
-        N_non_parallel_moves += len(move_set)
-
-        # calculating the time to complete the move set in parallel
-        t_total += move_time
-
-    return array, float(t_total), [N_parallel_moves, N_non_parallel_moves]
-
-
 class BenchmarkingFigure:
     """
 
