@@ -3,7 +3,7 @@
 #   Feel free to use this as a template for new algorithms.
 #   Each function below describes the requirements/what you need to put in it.
 
-# Author: Nikhil Harle, Aidan Curtis
+# Author: Nikhil Harle
 
 import numpy as np
 
