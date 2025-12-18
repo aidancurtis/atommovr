@@ -17,7 +17,9 @@ class Move:
         self.dy = to_row - from_row
         self.distance = self._get_distance()
         self.midx, self.midy = self._get_move_midpoint()
+
         self.failure_flag = 0
+        self.tweezer_id = 0
 
     def __repr__(self) -> str:
         return self.move_str()

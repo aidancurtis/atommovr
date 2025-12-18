@@ -3,10 +3,10 @@
 import copy
 import math
 import random
-from collections import Counter, deque
 
 import numpy as np
 
+from atommover.utils import Move
 from atommover.utils.animation import dual_species_image, single_species_image
 from atommover.utils.core import (
     ArrayGeometry,
@@ -18,7 +18,7 @@ from atommover.utils.core import (
 from atommover.utils.customize import SPECIES1NAME, SPECIES2NAME
 from atommover.utils.ErrorModel import ErrorModel
 from atommover.utils.errormodels import ZeroNoise
-from atommover.utils.move_utils import MoveType
+from atommover.utils.TweezerArray import TweezerArrayModel
 
 
 class AtomArray:
@@ -56,7 +56,7 @@ class AtomArray:
         geom: ArrayGeometry = ArrayGeometry.RECTANGULAR,
     ):
         self.geom = geom
-        super().__setattr__("shape", shape)
+        self.shape = shape
         if n_species in [1, 2] and type(n_species) == int:
             self.n_species = n_species
         else:
@@ -246,362 +246,21 @@ class AtomArray:
 
         self.target = np.stack([self.target_Rb, self.target_Cs], axis=2)
 
-    def move_atoms(self, move_list: list) -> list:
+    def move_atoms(self, moves: list[list[Move]]) -> tuple[float, int, int]:
+        """
+        Move atoms in tweezers according to moves
+        Each list in moves should include a list of sequential atom moves for a single tweezer
+
+        Returns:
+            (move_time, n_parallel_moves, n_total_moves): tuple[float, int, int]
+        """
         if np.max(self.matrix) > 1:
             raise Exception("Atom array cannot have values outside of {0,1}.")
 
-        # make sure `moves` is a list and not just a singular `Move` object
-        try:
-            move_list[0]
-        except TypeError:
-            move_list = [move_list]
+        tweezers = TweezerArrayModel(move_list=moves)
+        move_time, n_parallel_moves, n_total_moves = tweezers.move_atoms(self.matrix)
 
-        # evaluating moves from error model and assigning failure flags
-        moves_w_flags = self.error_model.get_move_errors(
-            state=self.matrix, moves=move_list
-        )
-
-        moves_wo_conflicts, duplicate_move_inds = (
-            self._find_and_resolve_same_dest_moves(move_list)
-        )
-
-        # prescreening moves to remove any intersecting tweezers
-        moves_wo_crossing, duplicate_move_inds = self._find_and_resolve_crossed_moves(
-            moves_wo_conflicts
-        )
-
-        # applying moves on current state of array
-        failed_moves, flags = self._apply_moves(moves_wo_crossing, duplicate_move_inds)
-
-        # if there are multiple atoms in a trap, they repel each other
-        if self.n_species == 1:
-            if np.max(self.matrix) > 1:
-                for i in range(len(self.matrix)):
-                    for j in range(len(self.matrix[0])):
-                        if self.matrix[i, j] > 1:
-                            self.matrix[i, j] = 0
-        elif self.n_species == 2:
-            if np.max(self.matrix[:, :, 0] + self.matrix[:, :, 1]) > 1:
-                for i in range(len(self.matrix)):
-                    for j in range(len(self.matrix[0])):
-                        if self.matrix[i, j, 0] + self.matrix[i, j, 1] > 1:
-                            self.matrix[i, j, 0] = 0
-                            self.matrix[i, j, 1] = 0
-
-        # calculating the time it took the atoms to be moved
-        max_distance = 0
-        for move in moves_wo_crossing:
-            dist = (
-                move.distance * self.params.spacing
-                + (self.error_model.putdown_time + self.error_model.pickup_time)
-                * self.params.AOD_speed
-            )
-            if dist > max_distance:
-                max_distance = dist
-
-        move_time = max_distance / self.params.AOD_speed
-
-        # applying error model to calculate atom loss during the time the move was applied
-        self.matrix, loss_flag = self.error_model.get_atom_loss(
-            self.matrix, evolution_time=move_time, n_species=self.n_species
-        )
-
-        return [failed_moves, flags], move_time
-
-    def _get_duplicate_vals_from_list(self, l):
-        return [k for k, v in Counter(l).items() if v > 1]
-
-    def _find_and_resolve_same_dest_moves(self, move_list: list) -> tuple[list, list]:
-        """
-        This function resolves situation where two moving tweezer end up at the same destination.
-
-        If any such tweezers are found, the atoms are only moved if they are both picked up, and the failure flag changes to 5.
-        """
-        destinations = []
-
-        for move in move_list:
-            destinations.append((move.to_row, move.to_col))
-
-        duplicate_vals = self._get_duplicate_vals_from_list(destinations)
-
-        dup_move_sets = [[] for i in range(len(duplicate_vals))]
-        dup_move_idxs = []
-        if duplicate_vals:
-            for move_idx, move in enumerate(move_list):
-                try:
-                    d_idx = duplicate_vals.index((move.to_row, move.to_col))
-                    dup_move_sets[d_idx].append(move_idx)
-                    dup_move_idxs.append(move_idx)
-                except ValueError:
-                    pass
-            for dup_move_set in dup_move_sets:
-                move_set_flag = 0
-                for move_idx in dup_move_set:
-                    move = move_list[move_idx]
-                    if self.matrix[move.from_row, move.from_col] == 1:
-                        if move.failure_flag != 1:
-                            move_set_flag += 1
-
-                if move_set_flag > 1:
-                    for move_idx in dup_move_set:
-                        move = move_list[move_idx]
-                        if move.failure_flag != 1:
-                            self.matrix[move.from_row][move.from_col][0] = 0
-                            if self.n_species == 2:
-                                self.matrix[move.from_row][move.from_col][1] = 0
-                            move.failure_flag = 5
-
-        return move_list, dup_move_idxs
-
-    def _find_and_resolve_crossed_moves(self, move_list: list) -> tuple[list, list]:
-        """
-        This function looks for situations where two moving tweezer paths cross over one another.
-
-        In this situation, it is assumed that any atoms being carried in the tweezers are lost.
-        If any such tweezers are found, the atoms are removed, and move.failure_flag is changed to 4.
-        """
-        # 1. getting midpoints of moves
-        midpoints = []
-
-        for move in move_list:
-            midpoints.append((move.midx, move.midy))
-
-        # 2. Finding duplicate midpoints
-        duplicate_vals = self._get_duplicate_vals_from_list(midpoints)
-
-        # 3. Sorting duplicate entries into distinct sets
-        crossed_move_sets = []
-        duplicate_move_inds = []
-        for i in range(len(duplicate_vals)):
-            crossed_move_sets.append([])
-        if len(crossed_move_sets) > 0:
-            for m_ind, move in enumerate(move_list):
-                try:
-                    d_ind = duplicate_vals.index((move.midx, move.midy))
-                    crossed_move_sets[d_ind].append(m_ind)
-                    duplicate_move_inds.append(m_ind)
-                except ValueError:
-                    pass
-            # 4. iterature through the sets of overlapping moves
-            for crossed_move_set in crossed_move_sets:
-                # 4.1. check to see if there are atoms that would be moved
-                for move_ind in crossed_move_set:
-                    move = move_list[move_ind]
-                    if np.sum(self.matrix[move.from_row, move.from_col, :]) == 1:
-                        # 4.2. if so, check whether the tweezer fails to pickup the atom
-                        if move.failure_flag != 1:
-                            self.matrix[move.from_row][move.from_col][0] = 0
-                            if self.n_species == 2:
-                                self.matrix[move.from_row][move.from_col][1] = 0
-                            move.failure_flag = 4
-                            move_list[move_ind] = move
-
-                    else:
-                        move.failure_flag = 3  # no atom to move
-        return move_list, duplicate_move_inds
-
-    def _apply_moves(
-        self, moves: list, duplicate_move_inds: list = []
-    ) -> tuple[list, list]:
-        """
-        Applies moves to an array of atoms (represented by `matrix_out`).
-        The function assumes that any moves which involve crossing tweezers
-        have already been filtered out by `find_and_resolve_crossed_moves()`.
-
-        ## Parameters
-        moves : list
-            list of 'Move' objects to implement in *parallel*.
-        duplicate_move_inds : list
-            output of `find_and_resolve_crossed_moves()`
-
-        ## Returns
-        failed_moves : list
-            list of the indices of moves that failed. Indices correspond to
-            the order of the moves as presented in `moves`.
-        flags : list
-            the corresponding failure flags of the failed moves (identifies
-            the type of failure).
-        """
-        if self.n_species == 1:
-            return self._apply_moves_single_species(moves, duplicate_move_inds)
-        elif self.n_species == 2:
-            return self._apply_moves_dual_species(moves, duplicate_move_inds)
-
-    def _apply_moves_single_species(
-        self, moves: list, duplicate_move_inds: list = []
-    ) -> tuple[list, list]:
-        """
-        Applies moves to an array of atoms (represented by `matrix_out`).
-        The function assumes that any moves which involve crossing tweezers
-        have already been filtered out by `find_and_resolve_crossed_moves()`.
-        """
-        state_before_moves = copy.deepcopy(self.matrix)
-        failed_moves = []
-        flags = []
-        # evaluate and run each move
-        for move_ind, move in enumerate(moves):
-            # check if the move crosses another move, and if so, it was already dealt with in `_find_and_resolve_crossed_moves()``
-            if move_ind in duplicate_move_inds:
-                failed_moves.append(move_ind)
-                flags.append(move.failure_flag)
-                move.movetype = MoveType.ILLEGAL_MOVE
-            else:
-                # fail flag code for the move: SUCCESS[0], PICKUPFAIL[1], PUTDOWNFAIL[2], NOATOM[3], CROSSED[4]
-
-                # Classify the move as:
-                #   a) legal (there is an atom in the pickup position and NO atom in the putdown position),
-                #   b) illegal (there is an atom in the pickup pos and an atom in the putdown pos)
-                #   c) eject (there is an atom in the pickup pos and the putdown pos is outside of the array)
-                #   d) no atom to move (there is NO atom in the pickup pos)
-                #   e) crossed (the moving tweezer intersects with another moving tweezer and the atom will be lost)
-
-                # if there is an atom in the pickup pos
-                if int(state_before_moves[move.from_row][move.from_col]) == 1:
-
-                    if (
-                        move.to_col > self.shape[1] - 1
-                        or move.to_row > self.shape[0] - 1
-                        or move.to_col < 0
-                        or move.to_row < 0
-                    ):
-                        move.movetype = MoveType.EJECT_MOVE
-                    else:
-                        # if the putdown pos is vacant, the move is legal
-                        if int(state_before_moves[move.to_row][move.to_col]) == 0:
-                            move.movetype = MoveType.LEGAL_MOVE
-                        # if the putdown pos is filled, the move is illegal/there will be a collision
-                        elif int(state_before_moves[move.to_row][move.to_col]) == 1:
-                            move.movetype = MoveType.ILLEGAL_MOVE
-                        else:
-                            raise Exception(
-                                f"{int(self.matrix[move.to_row][move.to_col])} is not a valid matrix entry."
-                            )
-                else:  # if there is no atom in the pickup pos
-                    move.movetype = MoveType.NO_ATOM_TO_MOVE
-                    move.failure_flag = 3
-
-                # if the move fails due to the atom not being picked up or put down correctly, make a note of this.
-                if move.failure_flag != 0:
-                    failed_moves.append(move_ind)
-                    flags.append(move.failure_flag)
-                    if move.failure_flag == 2:  # PUTDOWNFAIL, see above
-                        if state_before_moves[move.from_row][move.from_col] == 0:
-                            continue
-                            # raise Exception(f"Error occured in MoveType. There is NO atom at ({move.from_row}, {move.from_col}).")
-                        self.matrix[move.from_row][move.from_col] -= 1
-                # otherwise, if the target site is on the grid, you can implement it.
-                # NB: the double occupation of a site from a illegal/collision move will be detected later in `move_atoms`
-                elif (
-                    move.movetype == MoveType.LEGAL_MOVE
-                    or move.movetype == MoveType.ILLEGAL_MOVE
-                ):
-                    if state_before_moves[move.from_row][move.from_col] > 0:
-                        self.matrix[move.from_row][move.from_col] -= 1
-                        self.matrix[move.to_row][move.to_col] += 1
-                # elif the move is an ejection move or moves an atom into an occupied site, remove the atom(s)
-                elif move.movetype == MoveType.EJECT_MOVE:
-                    if state_before_moves[move.from_row][move.from_col] == 0:
-                        raise Exception(
-                            f"Error occured in MoveType assignment. There is NO atom at ({move.from_row}, {move.from_col})."
-                        )
-                    self.matrix[move.from_row][move.from_col] -= 1
-        return failed_moves, flags
-
-    def _apply_moves_dual_species(
-        self, moves: list, duplicate_move_inds: list = []
-    ) -> tuple[list, list]:
-        """
-        Applies moves on the dual species atom array.
-        """
-        failed_moves = []
-        flags = []
-        # evaluate and run each move
-        for move_ind, move in enumerate(moves):
-            if move_ind in duplicate_move_inds:
-                failed_moves.append(move_ind)
-                flags.append(move.failure_flag)
-            else:
-                # key for `Move` attribute `failure_flag`: SUCCESS[0], PICKUPFAIL[1], PUTDOWNFAIL[2], NOATOM[3], CROSSED[4]
-
-                # Classify the move as:
-                #   a) legal (there is an atom in the pickup position and NO atom in the putdown position),
-                #   b) illegal/collision (there is an atom in the pickup pos and an atom in the putdown pos)
-                #   c) eject (there is an atom in the pickup pos and the putdown pos is outside of the array)
-                #   d) no atom to move (there is NO atom in the pickup pos)
-                #   e) crossed (the moving tweezer intersects with another moving tweezer and the atom will be lost)
-
-                # if there is an atom in the pickup pos
-                if int(np.sum(self.matrix[move.from_row, move.from_col, :])) == 1:
-                    try:
-                        # check if there is NO atom in the putdown pos
-                        if (
-                            int(np.sum(self.matrix[move.to_row, move.to_col, :])) == 0
-                            and move.to_col >= 0
-                            and move.to_row >= 0
-                        ):
-                            move.movetype = MoveType.LEGAL_MOVE
-                        # check if there is an atom in the putdown pos
-                        elif (
-                            int(np.sum(self.matrix[move.to_row, move.to_col, :])) == 1
-                            and move.to_col >= 0
-                            and move.to_row >= 0
-                        ):
-                            move.movetype = MoveType.ILLEGAL_MOVE
-                        elif move.to_col >= 0 and move.to_row >= 0:
-                            raise Exception(
-                                f"{int(np.sum(self.matrix[move.to_row,move.to_col,:]))} is not a valid matrix entry."
-                            )
-                        else:
-                            raise IndexError
-                    except IndexError:
-                        move.movetype = MoveType.EJECT_MOVE
-                else:  # if there is no atom in the pickup pos
-                    move.movetype = MoveType.NO_ATOM_TO_MOVE
-                    move.failure_flag = 3
-
-                # if the move fails due to the atom not being picked up or put down correctly, make a note of this.
-                if move.failure_flag != 0:
-                    failed_moves.append(move_ind)
-                    flags.append(move.failure_flag)
-                    if move.failure_flag == 2:  # PUTDOWNFAIL, see above
-                        if (
-                            int(np.sum(self.matrix[move.from_row, move.from_col, :]))
-                            == 0
-                        ):
-                            raise Exception(
-                                f"Error occured in MoveType. There is NO atom at ({move.from_row}, {move.to_row})."
-                            )
-                        self.matrix[move.from_row][move.from_col][0] = 0
-                        self.matrix[move.from_row][move.from_col][1] = 0
-
-                # elif the move is valid, implement it
-                elif (
-                    move.movetype == MoveType.LEGAL_MOVE
-                    or move.movetype == MoveType.ILLEGAL_MOVE
-                ):
-                    # If there is a Rb atom, move it
-                    if self.matrix[move.from_row][move.from_col][0] > 0:
-                        self.matrix[move.from_row][move.from_col][0] -= 1
-                        self.matrix[move.to_row][move.to_col][0] += 1
-
-                    # elif there is a Cs atom, move it
-                    elif self.matrix[move.from_row][move.from_col][1] > 0:
-                        self.matrix[move.from_row][move.from_col][1] -= 1
-                        self.matrix[move.to_row][move.to_col][1] += 1
-
-                # elif the move is an ejection move, remove the atom(s)
-                elif move.movetype == MoveType.EJECT_MOVE:
-                    if np.sum(self.matrix[move.from_row, move.from_col, :]) == 0:
-                        raise Exception(
-                            f"Error occured in MoveType assignment. There is NO atom at ({move.from_row}, {move.to_row})."
-                        )
-                    # Eject Rb atom
-                    if self.matrix[move.from_row][move.from_col][0] > 0:
-                        self.matrix[move.from_row][move.from_col][0] -= 1
-                    # Eject Cs atom
-                    elif self.matrix[move.from_row][move.from_col][1] > 0:
-                        self.matrix[move.from_row][move.from_col][1] -= 1
-        return failed_moves, flags
+        return move_time, n_parallel_moves, n_total_moves
 
     def image(self, move_list: list = [], plotted_species: str = "all", savename=""):
         f"""
@@ -627,23 +286,13 @@ class AtomArray:
             else:
                 plotted_arrays = self
 
-            if plotted_species.lower() == "all":
+            if (
+                plotted_species.lower() == "all"
+                or plotted_species.lower() == SPECIES1NAME.lower()
+                or plotted_species.lower() == SPECIES2NAME.lower()
+            ):
                 dual_species_image(
                     plotted_arrays, move_list=move_list, savename=savename
-                )
-            elif plotted_species.lower() == SPECIES1NAME.lower():
-                dual_species_image(
-                    plotted_arrays,
-                    color_scheme="blue",
-                    move_list=move_list,
-                    savename=savename,
-                )
-            elif plotted_species.lower() == SPECIES2NAME.lower():
-                dual_species_image(
-                    plotted_arrays,
-                    color_scheme="yellow",
-                    move_list=move_list,
-                    savename=savename,
                 )
             else:
                 raise ValueError(
@@ -656,21 +305,27 @@ class AtomArray:
         elif self.n_species == 2:
             dual_species_image(self.target)
 
-    def evaluate_moves(self, move_list: list) -> "tuple[float, list]":
+    def evaluate_moves(self, move_list: list[list[list[Move]]]) -> tuple[float, list]:
+        """
+        Move atoms in tweezers according to move_list
+        Each list in move_list represents a different tweezer move sequence
+        Each tweezer move sequence (list) is a list of sequential atom moves for a single tweezer
+
+        Returns:
+            (move_time, n_parallel_moves, n_total_moves): tuple[float, int, int]
+        """
         # making reference time
         t_total = 0
         N_parallel_moves = 0
         N_non_parallel_moves = 0
 
         # iterating through moves and updating internal state matrix
-        for move_ind, move_set in enumerate(move_list):
-
+        for _, move_set in enumerate(move_list):
             # performing the move
-            [failed_moves, flags], move_time = self.move_atoms(move_set)
-            N_parallel_moves += 1
-            N_non_parallel_moves += len(move_set)
+            move_time, n_par_move, n_moves = self.move_atoms(move_set)
 
-            # calculating the time to complete the move set in parallel
+            N_parallel_moves += n_par_move
+            N_non_parallel_moves += n_moves
             t_total += move_time
 
         return float(t_total), [N_parallel_moves, N_non_parallel_moves]
