@@ -17,6 +17,7 @@ PPSU_DIR = os.path.join(BASE_DIR, "PPSU2023")
 LIB_PATH = os.path.join(PPSU_DIR, "libmatching_for_PPSU.so")
 SETUPC_PATH = os.path.join(PPSU_DIR, "setupc.py")
 
+
 def build_shared_library():
     """Run PPSU2023/setupc.py to build the shared library."""
     if not os.path.isfile(SETUPC_PATH):
@@ -24,6 +25,7 @@ def build_shared_library():
     print(f"[INFO] Attempting to build shared library via {SETUPC_PATH}...")
     subprocess.run([sys.executable, SETUPC_PATH, "build_ext"], check=True, cwd=PPSU_DIR)
     print("[INFO] Build completed.")
+
 
 try:
     lib = ctypes.CDLL(LIB_PATH)
@@ -40,7 +42,7 @@ try:
     else:
         # On Unix-like systems (Linux, macOS), use None to get the default C library
         libc = ctypes.CDLL(None)
-    
+
     try:
         stdout_fileno = sys.stdout.fileno()
         libc.fflush(None)  # Flush C stdio buffers
@@ -51,9 +53,11 @@ try:
 except (OSError, AttributeError) as e:
     # If we can't access the C library, define a no-op flush function
     print(f"[WARNING] Could not access C library for fflush: {e}")
+
     def noop_flush():
         sys.stdout.flush()  # Use Python's flush instead
-    libc = type('MockLibc', (), {'fflush': lambda x: noop_flush()})()
+
+    libc = type("MockLibc", (), {"fflush": lambda x: noop_flush()})()
     stdout_fileno = None
 
 # Define the function signature for bttlThreshold
@@ -75,6 +79,7 @@ lib.bttlThreshold.argtypes = [
     ctypes.c_int,  # sprankknown
 ]
 lib.bttlThreshold.restype = ctypes.c_int  # Returns the number of iterations
+
 
 def bttl_threshold(col_ptrs, col_ids, col_vals, n, m, sprankknown=0, lbapAlone=1):
     """
@@ -106,9 +111,21 @@ def bttl_threshold(col_ptrs, col_ids, col_vals, n, m, sprankknown=0, lbapAlone=1
 
     # Call the C function
     iterations = lib.bttlThreshold(
-        col_ptrs, col_ids, col_vals, ctypes.c_int(n), ctypes.c_int(m),
-        match, row_match, row_ptrs, row_ids, row_vals,
-        fend_cols, fend_rows, ctypes.c_int(lbapAlone), ctypes.byref(thrshld_g), sprankknown
+        col_ptrs,
+        col_ids,
+        col_vals,
+        ctypes.c_int(n),
+        ctypes.c_int(m),
+        match,
+        row_match,
+        row_ptrs,
+        row_ids,
+        row_vals,
+        fend_cols,
+        fend_rows,
+        ctypes.c_int(lbapAlone),
+        ctypes.byref(thrshld_g),
+        sprankknown,
     )
 
     # Return results

@@ -1,4 +1,4 @@
-# Dual-species algorithms. 
+# Dual-species algorithms.
 
 # FOR CONTRIBUTORS:
 # - Please write your algorithm in a separate .py file
@@ -8,20 +8,20 @@
 #   3. (optional) `__init__()` - if your algorithm needs to use arguments that cannot be specified in AtomArray
 # - see the `Algorithm` base class for more details/instructions.
 
-from atommover.utils.AtomArray import AtomArray
 from atommover.algorithms.Algorithm_class import Algorithm
 from atommover.algorithms.source.inside_out import inside_out_algorithm
 from atommover.algorithms.source.naive_parallel_Hung import naive_par_Hung
+from atommover.utils.AtomArray import AtomArray
 
 ###########################################
 # Existing algorithms from the literature #
 ###########################################
 
 
-
 ###########################################
 # New algorithms proposed in our work #
 ###########################################
+
 
 class InsideOut(Algorithm):
     """
@@ -29,10 +29,11 @@ class InsideOut(Algorithm):
     """
 
     def __repr__(self):
-        return 'InsideOut'
-    
+        return "InsideOut"
+
     def get_moves(self, dual_sp_array: AtomArray):
         return inside_out_algorithm(dual_sp_array)
+
 
 class NaiveParHung(Algorithm):
     """
@@ -40,7 +41,7 @@ class NaiveParHung(Algorithm):
     """
 
     def __repr__(self):
-        return 'NaiveParHung'
-    
+        return "NaiveParHung"
+
     def get_moves(self, dual_sp_array: AtomArray):
         return naive_par_Hung(dual_sp_array)
