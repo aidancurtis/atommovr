@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "atommover"
+version = "0.1.0"
+requires-python = ">=3.8"
+dependencies = [
+  "numpy",
+  "scipy",
+  "matplotlib",
+  "scikit-learn",
+  "numba",
+  "xarray",
+  "imageio==2.36.1",
+  "pillow==11.1.0"
+]
+
+[project.optional-dependencies]
+dev = ["ipykernel", "jupyter", "pytest", "black", "isort"]
+
+[tool.setuptools.packages.find]
+include = ["atommover*"]
+
+[tool.setuptools.package-data]
+"atommover" = ["extern/libmatching_for_PPSU.so"]
+
+[tool.pytest.ini_options]
+minversion = "7.0"
+addopts = "-ra -q -p no:warnings"
+testpaths = ["tests"]
+
+[tool.black]
+line-length = 88
+
+[tool.isort]
+profile = "black"
