@@ -316,13 +316,13 @@ class Benchmarking:
                     f"Number of system sizes {self.n_sizes} and shape of `target_configs` {np.shape(target_configs)} does not match. `target_configs` must have shape (len(sys_sizes), [number of target configs]). "
                 )
 
-    def save(self, savename) -> None:
+    def save(self, savename: str) -> None:
         if savename[-3:] == ".nc":
             savename = savename[0:-3]
         self.benchmarking_results.to_netcdf(f"data/{savename}.nc")
         print(f"Benchmarking object saved to `data/{savename}.nc`")
 
-    def load(self, loadname) -> None:
+    def load(self, loadname: str) -> None:
         if loadname[-3:] == ".nc":
             loadname = loadname[0:-3]
         self.benchmarking_results = xr.open_dataset(
@@ -554,7 +554,7 @@ class Benchmarking:
 
     def _run_benchmark_round(
         self,
-        algorithm,
+        algorithm: Algorithm,
         do_ejection: bool = False,
         pattern: Configurations | None = None,
         num_rounds=1,
