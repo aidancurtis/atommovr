@@ -30,7 +30,8 @@ def parallel_LBAP_algorithm_works(
 
     while (complete_flag == False) and (round_count < round_lim):
         # print(f"Got here_{round_count}")
-        N_independent_moves_path = []
+
+        n_independent_moves_path = []
         # 1. Generate the assignments
         prepared_assignments = generate_LBAP_assignments(matrix, target_config)
 
@@ -41,11 +42,11 @@ def parallel_LBAP_algorithm_works(
                 pass
             # Decompose the single_move_path into independent moves of several obstacle atoms
             else:
-                N_independent_moves_path.append(single_move_path)
+                n_independent_moves_path.append(single_move_path)
 
         # 3. Transform the N_independent_moves_path into a list of moves
         matrix, Hung_parallel_move_set = transform_paths_into_moves(
-            matrix, N_independent_moves_path
+            matrix, n_independent_moves_path
         )
         move_set.extend(Hung_parallel_move_set)
 
@@ -69,8 +70,14 @@ def parallel_LBAP_algorithm_works(
     return eject_config, move_set, LBAP_success_flag
 
 
-def generate_LBAP_assignments(matrix, target_config):
+def generate_LBAP_assignments(matrix: np.ndarray, target_config: np.ndarray):
+    """
+    Generate linear bottle assignment problem assignments
 
+    Returns:
+        assignments (list[tuple[tuple[int,int], tuple[int,int]]]
+            - list of tuples with (start_pos, target_pos)
+    """
     # Define target positions for the center square in a matrix.
     current_positions, target_positions = define_current_and_target(
         matrix, target_config
@@ -99,21 +106,17 @@ def generate_LBAP_assignments(matrix, target_config):
         sparsemat.shape[1],
     )
     col_inds = result_dict["match"]
-    col_ind = []
-    row_ind = []
+    col_ind: list[int] = []
+    row_ind: list[int] = []
     for c_ind in range(len(col_inds)):
         col = col_inds[c_ind]
         row = c_ind
         try:
             cost_matrix[row, col]
-            col_ind.append(col)
-            row_ind.append(row)
+            col_ind.append(int(col))
+            row_ind.append(int(row))
         except IndexError:
             pass
-    # costs = []
-    # for row_ind in range(len(sq_cost)):
-    #     col_ind = col_inds[row_ind]
-    #     costs.append(sq_cost[row_ind, col_ind])
 
     # Pair up row_ind and col_ind and sort by col_ind
     paired_indices = sorted(zip(row_ind, col_ind), key=lambda x: x[1])
@@ -416,9 +419,13 @@ def generate_AOD_cmds(matrix, move_seq):
             break
 
     if parallel_success_flag:
-        move_list = get_move_list_from_AOD_cmds(vert_AOD_cmds, horiz_AOD_cmds)
-        matrix_from_AOD, _ = move_atoms(copy.deepcopy(matrix), move_list)
-        matrix_from_seq, _ = move_atoms(copy.deepcopy(matrix), move_seq)
+        move_list: list[int] = get_move_list_from_AOD_cmds(
+            vert_AOD_cmds, horiz_AOD_cmds
+        )
+        matrix_from_AOD = copy.deepcopy(matrix)
+        matrix_from_seq = copy.deepcopy(matrix)
+        TweezerArrayModel(move_list).move_atoms(matrix_from_AOD)
+        TweezerArrayModel(move_list).move_atoms(matrix_from_seq)
 
         if not np.array_equal(matrix_from_AOD, matrix_from_seq):
             parallel_success_flag = False
@@ -505,91 +512,91 @@ def regroup_parallel_moves(matrix, move_seqq):
     return parallel_seq
 
 
-def transform_paths_into_moves(
-    matrix, N_independent_moves_path
-) -> tuple[np.ndarray, list[list[list[Move]]]]:
-    parallel_move_set: list[list[list[Move]]] = []
-
-    # 1. Build up intersection information for these N independent paths
-    intersection_matrix = np.zeros(
-        (len(N_independent_moves_path), len(N_independent_moves_path), 1)
-    )
-    intersection_coordinates = [
-        [[] for _ in range(len(N_independent_moves_path))]
-        for _ in range(len(N_independent_moves_path))
-    ]
-    intersection_set = {}
-
-    for i in range(len(N_independent_moves_path)):
-        for j in range(i, len(N_independent_moves_path)):
-            if i != j:
-                intersection_matrix[i][j], intersection_coordinates[i][j] = (
-                    check_intersection(
-                        N_independent_moves_path[i], N_independent_moves_path[j]
-                    )
-                )
-                if len(intersection_coordinates[i][j]) > 0:
-                    for intersection in intersection_coordinates[i][j]:
-                        # Add a list of intersection coordinates
-                        if intersection not in intersection_set:
-                            intersection_set[intersection] = 0
-                        # If the intersection is already in the set, increase the counter
-                        else:
-                            intersection_set[intersection] = (
-                                intersection_set[intersection] + 1
-                            )
-
-    # 2. Implement the moves via N_independent_moves_path
-    # 2.1 Reconstruct new move list regarding the parallel moves
-    keep_running_flag = True
-    count = 0
-    # Why count < 5? Most of the path have less than 5 moves.
-    while keep_running_flag and count < 5:
-        keep_running_flag = True
-        moves_in_scan = []
-        destination_set = set()
-        # 2.1.1 If there is no crossing path, implement one move for each path
-        for path_in_moves in N_independent_moves_path:
-            # Check if there are unimplemented moves in the path
-            if len(path_in_moves) > 0:
-                for move in path_in_moves:
-                    crossing_path_flag = check_crossing_path(
-                        matrix,
-                        move[0],
-                        intersection_set,
-                        destination_set,
-                        path_in_moves,
-                    )
-                    if not crossing_path_flag:
-                        moves_in_scan.append(move[0])
-                        path_in_moves.pop(0)
-                        destination_set.add((move[0].to_row, move[0].to_col))
-                    else:
-                        break
-        # 2.1.2 Parallelize the moves in the same round
-        if len(moves_in_scan) > 0:
-            moves_in_scan = regroup_parallel_moves(matrix, moves_in_scan)
-            # 2.1.3 Implement the moves
-            parallel_move_set.extend(moves_in_scan)
-            for moves in moves_in_scan:
-                matrix, _ = move_atoms(matrix, moves)
-                for move in moves:
-                    if (move.from_row, move.from_col) in intersection_set:
-                        if intersection_set[(move.from_row, move.from_col)] > 0:
-                            intersection_set[(move.from_row, move.from_col)] -= 1
-                        else:
-                            del intersection_set[(move.from_row, move.from_col)]
-
-                    if (move.to_row, move.to_col) in intersection_set:
-                        if intersection_set[(move.to_row, move.to_col)] > 0:
-                            intersection_set[(move.to_row, move.to_col)] -= 1
-                        else:
-                            del intersection_set[(move.to_row, move.to_col)]
-        else:
-            keep_running_flag = False
-        count += 1
-
-    return matrix, parallel_move_set
+# def transform_paths_into_moves(
+#     matrix, N_independent_moves_path
+# ) -> tuple[np.ndarray, list[list[list[Move]]]]:
+#     parallel_move_set: list[list[list[Move]]] = []
+#
+#     # 1. Build up intersection information for these N independent paths
+#     intersection_matrix = np.zeros(
+#         (len(N_independent_moves_path), len(N_independent_moves_path), 1)
+#     )
+#     intersection_coordinates = [
+#         [[] for _ in range(len(N_independent_moves_path))]
+#         for _ in range(len(N_independent_moves_path))
+#     ]
+#     intersection_set = {}
+#
+#     for i in range(len(N_independent_moves_path)):
+#         for j in range(i, len(N_independent_moves_path)):
+#             if i != j:
+#                 intersection_matrix[i][j], intersection_coordinates[i][j] = (
+#                     check_intersection(
+#                         N_independent_moves_path[i], N_independent_moves_path[j]
+#                     )
+#                 )
+#                 if len(intersection_coordinates[i][j]) > 0:
+#                     for intersection in intersection_coordinates[i][j]:
+#                         # Add a list of intersection coordinates
+#                         if intersection not in intersection_set:
+#                             intersection_set[intersection] = 0
+#                         # If the intersection is already in the set, increase the counter
+#                         else:
+#                             intersection_set[intersection] = (
+#                                 intersection_set[intersection] + 1
+#                             )
+#
+#     # 2. Implement the moves via N_independent_moves_path
+#     # 2.1 Reconstruct new move list regarding the parallel moves
+#     keep_running_flag = True
+#     count = 0
+#     # Why count < 5? Most of the path have less than 5 moves.
+#     while keep_running_flag and count < 5:
+#         keep_running_flag = True
+#         moves_in_scan = []
+#         destination_set = set()
+#         # 2.1.1 If there is no crossing path, implement one move for each path
+#         for path_in_moves in N_independent_moves_path:
+#             # Check if there are unimplemented moves in the path
+#             if len(path_in_moves) > 0:
+#                 for move in path_in_moves:
+#                     crossing_path_flag = check_crossing_path(
+#                         matrix,
+#                         move[0],
+#                         intersection_set,
+#                         destination_set,
+#                         path_in_moves,
+#                     )
+#                     if not crossing_path_flag:
+#                         moves_in_scan.append(move[0])
+#                         path_in_moves.pop(0)
+#                         destination_set.add((move[0].to_row, move[0].to_col))
+#                     else:
+#                         break
+#         # 2.1.2 Parallelize the moves in the same round
+#         if len(moves_in_scan) > 0:
+#             moves_in_scan = regroup_parallel_moves(matrix, moves_in_scan)
+#             # 2.1.3 Implement the moves
+#             parallel_move_set.extend(moves_in_scan)
+#             for moves in moves_in_scan:
+#                 matrix, _ = move_atoms(matrix, moves)
+#                 for move in moves:
+#                     if (move.from_row, move.from_col) in intersection_set:
+#                         if intersection_set[(move.from_row, move.from_col)] > 0:
+#                             intersection_set[(move.from_row, move.from_col)] -= 1
+#                         else:
+#                             del intersection_set[(move.from_row, move.from_col)]
+#
+#                     if (move.to_row, move.to_col) in intersection_set:
+#                         if intersection_set[(move.to_row, move.to_col)] > 0:
+#                             intersection_set[(move.to_row, move.to_col)] -= 1
+#                         else:
+#                             del intersection_set[(move.to_row, move.to_col)]
+#         else:
+#             keep_running_flag = False
+#         count += 1
+#
+#     return matrix, parallel_move_set
 
 
 ##Find possible path between start and end position
@@ -727,47 +734,3 @@ def flatten_tuple(nested_tuple):
 
     # Convert the list of tuples into a single tuple
     return tuple(result)
-
-
-def generate_target_config(
-    size: list,
-    pattern: Configurations = Configurations.ZEBRA_HORIZONTAL,
-    middle_size: list = [],
-    probability: float = 0.5,
-) -> np.ndarray:
-    """A function for generating common target configurations,
-    such as checkerboard, zebra stripes, and middle fill.
-    """
-    array = np.zeros(size)
-
-    if len(middle_size) == 0:
-        middle_size = generate_middle_fifty(size[0])
-
-    if pattern == Configurations.ZEBRA_HORIZONTAL:  # every other row
-        for i in range(0, size[0], 2):
-            array[i, :] = 1
-    elif pattern == 1:  # every other col
-        for i in range(0, size[1], 2):
-            array[:, i] = 1
-    elif pattern == 2:  # checkerboard
-        array = np.indices(size).sum(axis=0) % 2
-    elif pattern == 3:  # middle fill
-        mrow = np.zeros([1, size[1]])
-        mrow[
-            0,
-            int(size[1] / 2 - middle_size[1] / 2) : int(
-                size[1] / 2 - middle_size[1] / 2
-            )
-            + middle_size[1],
-        ] = 1
-        for i in range(
-            int(size[0] / 2 - middle_size[0] / 2),
-            int(size[0] / 2 - middle_size[0] / 2) + middle_size[0],
-        ):
-            array[i, :] = mrow
-    elif pattern == 4:
-        for i in range(middle_size[0]):
-            array[:, i] = 1
-    elif pattern == 5:
-        array = random_loading(size, probability=probability)
-    return array
