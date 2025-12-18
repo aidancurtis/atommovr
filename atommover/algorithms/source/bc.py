@@ -2,7 +2,7 @@
 import numpy as np
 
 from atommover.algorithms.source.ejection import ejection
-from atommover.utils.animation import *
+from atommover.animation import *
 from atommover.utils.core import *
 from atommover.utils.move_utils import *
 

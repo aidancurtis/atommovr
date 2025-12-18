@@ -2,8 +2,8 @@ import copy
 
 import numpy as np
 
-from atommover.utils.Move import Move
-from atommover.utils.Tweezer import Tweezer, TweezerLossFlags
+from atommover.move import Move
+from atommover.tweezer import Tweezer, TweezerLossFlags
 
 
 def test_simulate_move_sequence():

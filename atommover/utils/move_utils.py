@@ -1,16 +1,14 @@
 # Core functions and classes for moving atoms
 
 import copy
-import random
 from collections import Counter
 from enum import IntEnum
 
 import numpy as np
 
+from atommover.move import Move
 from atommover.utils.core import PhysicalParams
-from atommover.utils.ErrorModel import ErrorModel
 from atommover.utils.errormodels import ZeroNoise
-from atommover.utils.Move import Move
 
 
 class MoveType(IntEnum):

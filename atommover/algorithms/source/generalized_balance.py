@@ -2,7 +2,7 @@
 from collections import deque
 
 from atommover.algorithms.source.ejection import *
-from atommover.utils.animation import *
+from atommover.animation import *
 from atommover.utils.core import *
 from atommover.utils.move_utils import *
 

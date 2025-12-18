@@ -1,8 +1,7 @@
 import numpy as np
-import pytest
 
-from atommover.utils import Move
-from atommover.utils.AtomArray import AtomArray
+from atommover.atom_array import AtomArray
+from atommover.move import Move
 from atommover.utils.core import Configurations
 from atommover.utils.errormodels import UniformVacuumTweezerError
 

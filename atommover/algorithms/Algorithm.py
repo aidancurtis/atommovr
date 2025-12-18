@@ -6,8 +6,8 @@
 
 import numpy as np
 
-from atommover.utils.AtomArray import AtomArray
-from atommover.utils.Move import Move
+from atommover.atom_array import AtomArray
+from atommover.move import Move
 
 
 class Algorithm:

@@ -11,7 +11,7 @@
 from atommover.algorithms.Algorithm import Algorithm
 from atommover.algorithms.source.inside_out import inside_out_algorithm
 from atommover.algorithms.source.naive_parallel_Hung import naive_par_Hung
-from atommover.utils.AtomArray import AtomArray
+from atommover.atom_array import AtomArray
 
 ###########################################
 # Existing algorithms from the literature #

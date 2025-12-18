@@ -5,9 +5,9 @@ import random
 
 import numpy as np
 
+from atommover.error_model import ErrorModel
+from atommover.move import Move
 from atommover.utils.core import atom_loss, atom_loss_dual
-from atommover.utils.ErrorModel import ErrorModel
-from atommover.utils.Move import Move
 
 
 class ZeroNoise(ErrorModel):

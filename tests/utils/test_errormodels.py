@@ -1,6 +1,6 @@
 import numpy as np
 
-from atommover.utils import Move
+from atommover.move import Move
 from atommover.utils.errormodels import UniformVacuumTweezerError, ZeroNoise
 
 

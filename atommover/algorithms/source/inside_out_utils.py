@@ -11,8 +11,8 @@ import numpy as np
 from scipy.optimize import linear_sum_assignment
 
 from atommover.algorithms.source.Hungarian_works import generate_AOD_cmds
-from atommover.utils.AtomArray import AtomArray
-from atommover.utils.Move import Move
+from atommover.atom_array import AtomArray
+from atommover.move import Move
 from atommover.utils.move_utils import *
 
 

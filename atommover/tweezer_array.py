@@ -4,8 +4,8 @@ from collections import Counter
 
 import numpy as np
 
-from atommover.utils import Move
-from atommover.utils.Tweezer import Tweezer, TweezerLossFlags
+from atommover.move import Move
+from atommover.tweezer import Tweezer, TweezerLossFlags
 
 
 class TweezerArrayModel:

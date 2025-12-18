@@ -6,7 +6,10 @@ import random
 
 import numpy as np
 
-from atommover.utils.animation import dual_species_image, single_species_image
+from atommover.animation import dual_species_image, single_species_image
+from atommover.error_model import ErrorModel
+from atommover.move import Move
+from atommover.tweezer_array import TweezerArrayModel
 from atommover.utils.core import (
     ArrayGeometry,
     Configurations,
@@ -15,10 +18,7 @@ from atommover.utils.core import (
     random_loading,
 )
 from atommover.utils.customize import SPECIES1NAME, SPECIES2NAME
-from atommover.utils.ErrorModel import ErrorModel
 from atommover.utils.errormodels import ZeroNoise
-from atommover.utils.Move import Move
-from atommover.utils.TweezerArray import TweezerArrayModel
 
 
 class AtomArray:

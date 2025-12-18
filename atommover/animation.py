@@ -4,9 +4,9 @@ import imageio.v2 as imageio
 from matplotlib import pyplot as plt
 from matplotlib.patches import Rectangle
 
+from atommover.move import Move
 from atommover.utils.core import *
 from atommover.utils.customize import *
-from atommover.utils.Move import Move
 from atommover.utils.move_utils import MoveType
 
 ######################################

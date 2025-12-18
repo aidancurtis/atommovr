@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from atommover.utils.Move import Move
+from atommover.move import Move
 
 
 class ErrorModel:

@@ -8,7 +8,7 @@ import numpy as np
 import xarray as xr
 
 from atommover.algorithms.Algorithm import Algorithm
-from atommover.utils.AtomArray import AtomArray
+from atommover.atom_array import AtomArray
 from atommover.utils.core import (
     Configurations,
     PhysicalParams,

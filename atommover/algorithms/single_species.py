@@ -17,8 +17,8 @@ from atommover.algorithms.source.Hungarian_works import (
     parallel_Hungarian_algorithm_works,
     parallel_LBAP_algorithm_works,
 )
-from atommover.utils.AtomArray import AtomArray
-from atommover.utils.Move import Move
+from atommover.atom_array import AtomArray
+from atommover.move import Move
 
 ##########################
 # Bernien Lab algorithms #
