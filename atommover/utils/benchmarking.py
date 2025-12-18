@@ -1,19 +1,24 @@
 # Object for running benchmarking rounds and saving data
 
-import sys
 import copy
-import random
 import math
+import random
+import sys
+from typing import Union
+
+import matplotlib.pyplot as plt
 import numpy as np
 import xarray as xr
-from typing import Union
-import matplotlib.pyplot as plt
 
-from atommover.utils.errormodels import ZeroNoise
-from atommover.utils.core import generate_random_target_configs, generate_random_init_configs, PhysicalParams, Configurations, CONFIGURATION_PLOT_LABELS
-from atommover.utils.move_utils import move_atoms
+from atommover.algorithms.Algorithm_class import (Algorithm,
+                                                  get_effective_target_grid)
 from atommover.utils.AtomArray import AtomArray
-from atommover.algorithms.Algorithm_class import Algorithm, get_effective_target_grid
+from atommover.utils.core import (CONFIGURATION_PLOT_LABELS, Configurations,
+                                  PhysicalParams, generate_random_init_configs,
+                                  generate_random_target_configs)
+from atommover.utils.errormodels import ZeroNoise
+from atommover.utils.move_utils import move_atoms
+
 
 def evaluate_moves(array: AtomArray ,move_list: list):
     # making reference time
@@ -402,7 +407,7 @@ class Benchmarking():
                 
         for shot in range(self.n_shots):
             # getting initial and final target configs
-            initial_config = self.init_config_storage[shot][:self.tweezer_array.shape[0], :self.tweezer_array.shape[1]]
+            initial_config = self.init_config_storage[shot][:self.tweezer_array.shape[0], :self.tweezer_array.shape[1]].copy()
             self.tweezer_array.matrix = initial_config.reshape([self.tweezer_array.shape[0], self.tweezer_array.shape[1], self.tweezer_array.n_species])
             if self.istargetlist:
                 if pattern == Configurations.RANDOM:
@@ -412,7 +417,7 @@ class Benchmarking():
                 init_count = 0
                 while np.sum(initial_config) < np.sum(self.tweezer_array.target) and init_count < 100:
                     self.tweezer_array.load_tweezers()
-                    initial_config = self.tweezer_array.matrix
+                    initial_config = self.tweezer_array.matrix.copy()
                     init_count += 1
                 if init_count == 100:
                     print(f'[WARNING] could not find initial configuration with enough atoms ({np.sum(self.tweezer_array.target)}) in target). \
@@ -445,7 +450,7 @@ class Benchmarking():
                 wrong_places.append(int(np.sum(np.abs(self.tweezer_array.matrix - self.tweezer_array.target))))
             else:
                 start_row, end_row, start_col, end_col = get_effective_target_grid(self.tweezer_array.target)
-                wrong_places.append(int(np.sum(np.abs(self.tweezer_array.matrix[start_row:end_row, start_col:end_col] - self.tweezer_array.target[start_row:end_row, start_col:end_col]))))
+                wrong_places.append(int(np.sum(np.abs(self.tweezer_array.matrix[start_row:end_row + 1, start_col:end_col + 1] - self.tweezer_array.target[start_row:end_row + 1, start_col:end_col + 1]))))
             # Count atoms in array
             atoms_in_arrays.append(int(np.sum(self.tweezer_array.matrix)))
             atoms_in_targets.append(int(np.sum(self.tweezer_array.target)))

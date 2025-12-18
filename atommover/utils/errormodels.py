@@ -2,11 +2,13 @@
 
 import copy
 import random
+
 import numpy as np
 
 from atommover.utils.core import atom_loss, atom_loss_dual
 from atommover.utils.ErrorModel import ErrorModel
 from atommover.utils.Move import Move
+
 
 class ZeroNoise(ErrorModel):
     """
@@ -22,7 +24,7 @@ class ZeroNoise(ErrorModel):
         return self.name
     
     def get_move_errors(self, state: np.ndarray, moves: list[Move]) -> list:
-        """ 
+        """
         Given a set of moves and the current state, assigns
         an attribute `failure_flag` to the move. 
         - If the move suceeds, `move_failure_flag = 0`.
@@ -39,9 +41,9 @@ class ZeroNoise(ErrorModel):
         return moves
 
     def get_atom_loss(self, state: np.ndarray, evolution_time: float, n_species: int = 1) -> tuple[np.ndarray, bool]:
-        """ 
+        """
         Given the current state of the atom array, applies any general loss process
-        over the period $\Delta t$ = evolution_time.
+        over the period Δt = evolution_time.
 
         For this error model, it just returns the same state.
 
@@ -130,7 +132,7 @@ class UniformVacuumTweezerError(ErrorModel):
                       n_species: int = 1) -> tuple[np.ndarray, bool]:
         """ 
         Given the current state of the atom array, applies any general loss process
-        over the period $$\Delta t$$ = evolution_time.
+        over the period Δt = evolution_time.
 
         For this error model, we consider uniform loss from background gas particles
         knocking atoms out of their traps. 
