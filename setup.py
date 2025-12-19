@@ -68,7 +68,6 @@ class BuildSharedLibrary(build_ext):
 setup(
     name="atommover",
     version="0.1.0",
-    packages=find_packages(),  # includes 'atommover'
     ext_modules=[c_extension],
     cmdclass={"build_ext": BuildSharedLibrary},
     include_package_data=True,  # ensure shared lib is included
