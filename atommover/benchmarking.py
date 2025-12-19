@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import xarray as xr
 
-from atommover.algorithms.Algorithm import Algorithm
+from atommover.algorithms.algorithm import Algorithm
 from atommover.atom_array import AtomArray
 from atommover.utils.core import (
     Configurations,

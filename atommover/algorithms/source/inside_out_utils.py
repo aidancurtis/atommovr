@@ -10,7 +10,7 @@ from typing import Callable
 import numpy as np
 from scipy.optimize import linear_sum_assignment
 
-from atommover.algorithms.source.Hungarian_works import generate_AOD_cmds
+from atommover.algorithms.source.hungarian_works import generate_AOD_cmds
 from atommover.atom_array import AtomArray
 from atommover.move import Move
 from atommover.utils.move_utils import *

@@ -8,7 +8,7 @@ from scipy.sparse import csr_matrix
 from atommover.algorithms.source.ejection import ejection
 from atommover.algorithms.source.PPSU_weight_matching import bttl_threshold
 from atommover.algorithms.source.scaling_lower_bound import make_cost_matrix_square
-from atommover.algorithms.utils import is_target_loaded
+from atommover.algorithms.utils.core_utils import is_target_loaded
 from atommover.tweezer_array import TweezerArrayModel
 from atommover.utils.core import Configurations, generate_middle_fifty, random_loading
 from atommover.utils.move_utils import Move, get_move_list_from_AOD_cmds
@@ -136,7 +136,7 @@ def generate_LBAP_assignments(matrix: np.ndarray, target_config: np.ndarray):
     return prepared_assignments
 
 
-def Hungarian_algorithm_works(
+def hungarian_algorithm_works(
     atom_arrays: np.ndarray,
     target_config: np.ndarray,
     do_ejection: bool = False,
@@ -196,7 +196,7 @@ def Hungarian_algorithm_works(
     return eject_config, move_set, success_flag
 
 
-def parallel_Hungarian_algorithm_works(
+def parallel_hungarian_algorithm_works(
     atom_arrays: np.ndarray,
     target_config: np.ndarray,
     do_ejection: bool = False,
