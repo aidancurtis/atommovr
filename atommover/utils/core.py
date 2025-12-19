@@ -40,7 +40,7 @@ class PhysicalParams:
     """Class used to store various physical parameters corresponding to atom, array and tweezer properties.
 
     ## Parameters
-    AOD_speed : float
+    tweezer_speed : float
         the speed of the moving tweezers, in um/us. Default: 0.1
     spacing : float
         spacing between adjacent atoms in the square array, in m. Default: 5e-6
@@ -53,7 +53,7 @@ class PhysicalParams:
 
     def __init__(
         self,
-        AOD_speed: float = 0.1,
+        tweezer_speed: float = 0.1,
         spacing: float = 5e-6,
         loading_prob: float = 0.6,
         target_occup_prob: float = 0.5,
@@ -68,7 +68,7 @@ class PhysicalParams:
         self.target_occup_prob = target_occup_prob
 
         # tweezer parameters
-        self.AOD_speed = AOD_speed
+        self.tweezer_speed = tweezer_speed
 
 
 class ArrayGeometry(IntEnum):

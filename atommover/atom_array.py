@@ -37,8 +37,7 @@ class AtomArray:
     ```
     n_cols, n_rows = 10,10
     n_species = 1
-    error_model = UniformVacuumTweezerError()
-    tweezer_array = AtomArray([n_cols, n_rows],n_species, error_model=error_model)
+    tweezer_array = AtomArray([n_cols, n_rows], n_species)
     ```
     """
 
@@ -302,7 +301,7 @@ class AtomArray:
         """
         Checks whether the target configuration has been successfully prepared.
 
-            The desired target configuration. Must have the same shape as `self.matrix`.
+        The desired target configuration. Must have the same shape as `self.matrix`.
 
         **do_ejection** : bool, optional (default = False)
             If True, the function checks the entire `self.matrix` array against `target`.
@@ -350,21 +349,18 @@ class AtomArray:
 
         return success_flag
 
-    def image(self, move_list: list = [], plotted_species: str = "all", savename=""):
-        f"""
+    def image(
+        self, move_list: list[Move] = [], plotted_species: str = "all", savename=""
+    ):
+        """
         Takes a snapshot of the atom array.
-        ## Parameters
+
+        Parameters
         move_list : list
             any moves that you want to plot
-        plotted_species : str 
+        plotted_species : str
             the atomic species you want to plot. You can choose from ['{SPECIES1NAME}','{SPECIES2NAME}','all'].
         """
-        # make sure `moves` is a list and not just a singular `Move` object
-        if not np.array_equal(move_list, []):
-            try:
-                move_list[0]
-            except TypeError:
-                move_list = [move_list]
 
         if self.n_species == 1:
             single_species_image(self.matrix, move_list=move_list, savename=savename)

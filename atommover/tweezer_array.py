@@ -6,6 +6,7 @@ import numpy as np
 
 from atommover.move import Move
 from atommover.tweezer import Tweezer, TweezerLossFlags
+from atommover.utils.core import PhysicalParams
 
 
 class TweezerArrayModel:
@@ -16,6 +17,7 @@ class TweezerArrayModel:
     def __init__(
         self,
         move_list: list[list[Move]],
+        params: PhysicalParams = PhysicalParams(),
         speed: float = 1e6,
         array_spacing: float = 5e-6,
         pickup_time: float = 1e-6,
@@ -25,9 +27,9 @@ class TweezerArrayModel:
         self.max_moves = 0
         for moves in move_list:
             self.max_moves = max(self.max_moves, len(moves))
-            self.tweezers.append(Tweezer(moves=moves))
+            self.tweezers.append(Tweezer(params=params, moves=moves))
 
-        self.move_sequence: list[list[Move]] = [[] for i in range(self.max_moves)]
+        self.move_sequence: list[list[Move]] = [[] for _ in range(self.max_moves)]
         for moves in move_list:
             for i in range(self.max_moves):
                 if i < len(moves):
@@ -145,7 +147,7 @@ class TweezerArrayModel:
 
         n_parallel_moves = 0
         n_total_moves = 0
-        for i in range(len(self.move_sequence)):
+        for _ in range(len(self.move_sequence)):
             past_array = copy.deepcopy(array)
             move_in_seq = 0
             for tweezer in self.tweezers:
