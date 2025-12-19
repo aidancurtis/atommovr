@@ -4,17 +4,19 @@ import numpy as np
 
 from atommover.move import Move
 from atommover.tweezer import Tweezer, TweezerLossFlags
+from atommover.utils.core import PhysicalParams
 
 
 def test_simulate_move_sequence():
     moves = [Move(0, 0, 0, 1), Move(0, 1, 0, 2), Move(0, 2, 1, 2)]
-    tweezer = Tweezer(moves=moves)
+    tweezer = Tweezer(PhysicalParams(), moves=moves)
     matrix = np.array([[1, 0, 0], [0, 0, 0], [1, 1, 1]])
     move_time, num_moves, success_flag, error_flags = tweezer.simulate_move_sequence(
         matrix
     )
     assert move_time == float(
-        3 * ((moves[0].distance * tweezer.array_spacing) / tweezer.speed)
+        3
+        * ((moves[0].distance * tweezer.params.spacing) / tweezer.params.tweezer_speed)
     )
     assert num_moves == 3
     assert success_flag == 1
@@ -23,7 +25,7 @@ def test_simulate_move_sequence():
 
 def test_make_move():
     moves = [Move(0, 0, 0, 1), Move(0, 1, 0, 2), Move(0, 2, 1, 2)]
-    tweezer = Tweezer(moves=moves)
+    tweezer = Tweezer(PhysicalParams(), moves=moves)
     matrix = np.array([[1, 0, 0], [0, 0, 0], [1, 1, 1]])
     for i in range(3):
         move, flag = tweezer.make_move(matrix, copy.deepcopy(matrix))
@@ -32,7 +34,7 @@ def test_make_move():
     assert np.array_equal(matrix, np.array([[0, 0, 0], [0, 0, 1], [1, 1, 1]]))
 
     moves = [Move(0, 0, 0, 1), Move(0, 1, 0, 2), Move(0, 2, 1, 2)]
-    tweezer = Tweezer(moves=moves)
+    tweezer = Tweezer(PhysicalParams(), moves=moves)
     matrix = np.array([[1, 0, 0], [0, 0, 0], [1, 1, 1]])
     for i in range(10):
         try:
@@ -45,8 +47,8 @@ def test_make_move():
 
     # COLLISION_ERRORS flags currently not raised, but resulting array is correct
     moves = [Move(0, 0, 0, 1), Move(0, 1, 0, 2), Move(0, 2, 1, 2)]
+    tweezer = Tweezer(PhysicalParams(), moves=moves)
     flags = [0, TweezerLossFlags.COLLISION_ERROR, TweezerLossFlags.PICKUP_ERROR]
-    tweezer = Tweezer(moves=moves)
     matrix = np.array([[1, 0, 1], [0, 0, 0], [1, 1, 1]])
     for i in range(3):
         move, flag = tweezer.make_move(matrix, copy.deepcopy(matrix))
@@ -57,7 +59,7 @@ def test_make_move():
 
 def test_reset():
     moves = [Move(0, 0, 1, 0), Move(1, 0, 1, 0), Move(1, 0, 2, 0)]
-    tweezer = Tweezer(moves=moves)
+    tweezer = Tweezer(PhysicalParams(), moves=moves)
     matrix = np.array([[1, 0, 0], [0, 0, 0], [0, 1, 1]])
     array = copy.deepcopy(matrix)
     for i in range(3):

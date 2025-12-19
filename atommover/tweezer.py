@@ -4,6 +4,7 @@ from enum import IntEnum
 import numpy as np
 
 from atommover.move import Move
+from atommover.utils.core import PhysicalParams
 
 
 class TweezerLossFlags(IntEnum):
@@ -30,15 +31,13 @@ class Tweezer:
 
     def __init__(
         self,
-        speed: float = 1e6,
-        array_spacing: float = 5e-6,
-        vacuum_lifetime: float = 1e6,
+        params: PhysicalParams = PhysicalParams(),
+        vacuum_lifetime: float = float("inf"),
         pickup_error_prob: float = 0,
         putdown_error_prob: float = 0,
         moves: list[Move] = [],
     ):
-        self.speed = speed
-        self.array_spacing = array_spacing
+        self.params = params
         self.vacuum_lifetime = vacuum_lifetime
         if not (0 <= pickup_error_prob <= 1 and 0 <= putdown_error_prob <= 1):
             raise ValueError(
@@ -89,7 +88,9 @@ class Tweezer:
                 error_flags[0] = TweezerLossFlags.COLLISION_ERROR
                 array[self.moves[0].to_row, self.moves[0].to_col] = 0
 
-        move_time = (self.moves[0].distance * self.array_spacing) / self.speed
+        move_time = (
+            self.moves[0].distance * self.params.spacing
+        ) / self.params.tweezer_speed
         pickup_flag = True
         for i in range(1, len(self.moves)):
             move = self.moves[i]
@@ -119,7 +120,9 @@ class Tweezer:
                     # calculate whether tweezer is picked up
                     pickup_flag = np.random.random() > self.pickup_error_prob
 
-            move_time += (move.distance * self.array_spacing) / self.speed
+            move_time += (
+                move.distance * self.params.spacing
+            ) / self.params.tweezer_speed
 
         putdown_error = 1 if np.random.random() < self.putdown_error_prob else 0
         if (
@@ -147,7 +150,9 @@ class Tweezer:
 
         index = self.move_num
         move = self.moves[index]
-        self.move_time += (self.moves[index].distance * self.array_spacing) / self.speed
+        self.move_time += (
+            self.moves[index].distance * self.params.spacing
+        ) / self.params.tweezer_speed
         self.move_num += 1
 
         if move.failure_flag == TweezerLossFlags.PICKUP_ERROR:
@@ -202,39 +207,3 @@ class Tweezer:
         self.occupied = False
         self.move_num = 0
         self.move_time = 0
-
-
-# if __name__ == "__main__":
-#     array = np.array([[0, 0, 1], [1, 0, 0], [1, 1, 0]])
-#     print(array)
-#     moves = [Move(1, 0, 2, 0), Move(2, 0, 2, 1), Move(2, 1, 1, 1)]
-#     print(moves)
-#     print()
-#     tweezer = Tweezer(
-#         speed=1e6,
-#         array_spacing=5e-6,
-#         vacuum_lifetime=1e8,
-#         pickup_error_prob=0,
-#         putdown_error_prob=0,
-#         moves=moves,
-#     )
-#     # total_time, n_moves, success_flag, error_flags = tweezer.make_move_sequence(array)
-#     move, flag = tweezer.make_move(array, on=True)
-#     print(array)
-#     print(f"move: {move}")
-#     print(f"flag: {flag}")
-#
-#     move, flag = tweezer.make_move(array, on=False)
-#     print(array)
-#     print(f"move: {move}")
-#     print(f"flag: {flag}")
-#
-#     move, flag = tweezer.make_move(array, on=True)
-#     print(array)
-#     print(f"move: {move}")
-#     print(f"flag: {flag}")
-#
-#     # print(f"total_time: {total_time}")
-#     # print(f"n_moves: {n_moves}")
-#     # print(f"success_flag: {success_flag}")
-#     # print(f"error_flags: {error_flags}")
