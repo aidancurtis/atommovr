@@ -57,13 +57,13 @@ class AtomArray:
         geom: ArrayGeometry = ArrayGeometry.RECTANGULAR,
     ):
         self.geom = geom
-        self.shape = shape
         if n_species in [1, 2] and type(n_species) == int:
             self.n_species = n_species
         else:
             raise ValueError(
                 f"Invalid entry for parameter `n_species`: {n_species}. The simulator only supports single and dual species arrays. "
             )
+        self.shape = shape
         self.params = params
         self.error_model = error_model
 
